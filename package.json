@@ -1,0 +1,26 @@
+{
+  "name": "arkdata",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ArkData Platform — Multi-tenant pixel tracking, identity resolution, and data activation",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean",
+    "dev:web": "pnpm --filter @arkdata/web dev",
+    "dev:pixel-ingest": "pnpm --filter @arkdata/pixel-ingest dev",
+    "dev:identity-resolution": "pnpm --filter @arkdata/identity-resolution dev",
+    "build:web": "pnpm --filter @arkdata/web build",
+    "build:services": "turbo run build --filter='./services/*'"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  }
+}

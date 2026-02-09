@@ -1,0 +1,206 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================================================
+    // Helper Functions
+    // ========================================================================
+
+    // Check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Get the user's tenant ID from the auth token
+    function userTenantId() {
+      return request.auth.token.tenant_id;
+    }
+
+    // Get the user's role from the auth token
+    function userRole() {
+      return request.auth.token.role;
+    }
+
+    // Check if the user belongs to the specified tenant
+    function isTenantMember(tenantId) {
+      return isAuthenticated() && userTenantId() == tenantId;
+    }
+
+    // Check if the request comes from a server-side service account
+    function isServer() {
+      return isAuthenticated()
+        && request.auth.token.get('is_service_account', false) == true;
+    }
+
+    // Role hierarchy checks
+    function isSuperAdmin() {
+      return isAuthenticated() && userRole() == 'super_admin';
+    }
+
+    function isTenantAdmin(tenantId) {
+      return isTenantMember(tenantId) && userRole() == 'tenant_admin';
+    }
+
+    function isAnalyst(tenantId) {
+      return isTenantMember(tenantId) && userRole() == 'analyst';
+    }
+
+    function isOperator(tenantId) {
+      return isTenantMember(tenantId) && userRole() == 'operator';
+    }
+
+    function isReadOnly(tenantId) {
+      return isTenantMember(tenantId) && userRole() == 'read_only';
+    }
+
+    // Combined permission checks
+    function canRead(tenantId) {
+      return isSuperAdmin()
+        || isTenantAdmin(tenantId)
+        || isAnalyst(tenantId)
+        || isOperator(tenantId)
+        || isReadOnly(tenantId);
+    }
+
+    function canWrite(tenantId) {
+      return isSuperAdmin()
+        || isTenantAdmin(tenantId);
+    }
+
+    function canManageSyncsAndPixels(tenantId) {
+      return isSuperAdmin()
+        || isTenantAdmin(tenantId)
+        || isOperator(tenantId);
+    }
+
+    function canCreateDashboards(tenantId) {
+      return isSuperAdmin()
+        || isTenantAdmin(tenantId)
+        || isAnalyst(tenantId);
+    }
+
+    // ========================================================================
+    // Tenants Collection
+    // ========================================================================
+
+    match /tenants/{tenantId} {
+      // super_admin can read/write all tenants
+      // tenant_admin can read own tenant, update settings
+      // all tenant members can read their own tenant
+      allow read: if isSuperAdmin() || isTenantMember(tenantId);
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin() || isTenantAdmin(tenantId);
+      allow delete: if isSuperAdmin();
+
+      // ---- Users sub-collection ----
+      match /users/{userId} {
+        allow read: if canRead(tenantId);
+        allow create, update: if canWrite(tenantId);
+        allow delete: if isSuperAdmin() || isTenantAdmin(tenantId);
+      }
+    }
+
+    // ========================================================================
+    // Visitors Collection (tenant-scoped)
+    // ========================================================================
+
+    match /visitors/{visitorId} {
+      // All authenticated tenant members can read visitors
+      allow read: if canRead(resource.data.tenant_id);
+
+      // Only server (identity-resolution service) and admins can write
+      allow create, update: if isServer()
+        || isSuperAdmin()
+        || isTenantAdmin(resource.data.tenant_id);
+
+      allow delete: if isSuperAdmin()
+        || isTenantAdmin(resource.data.tenant_id);
+    }
+
+    // ========================================================================
+    // Events Collection (tenant-scoped) — append-only, server writes only
+    // ========================================================================
+
+    match /events/{eventId} {
+      // Authenticated tenant members can read events
+      allow read: if canRead(resource.data.tenant_id);
+
+      // ONLY server-side service accounts can write events.
+      // No client writes allowed — events originate from pixel-ingest
+      // pipeline via Pub/Sub and are written by backend services.
+      allow create: if isServer();
+      allow update: if isServer();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ========================================================================
+    // Sessions Collection (tenant-scoped)
+    // ========================================================================
+
+    match /sessions/{sessionId} {
+      allow read: if canRead(resource.data.tenant_id);
+
+      // Sessions are created/updated by backend services only
+      allow create, update: if isServer();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ========================================================================
+    // Pixels Collection (tenant-scoped)
+    // ========================================================================
+
+    match /pixels/{pixelId} {
+      allow read: if canRead(resource.data.tenant_id);
+
+      // Operators and admins can manage pixels
+      allow create, update: if canManageSyncsAndPixels(resource.data.tenant_id);
+      allow delete: if isSuperAdmin()
+        || isTenantAdmin(resource.data.tenant_id);
+    }
+
+    // ========================================================================
+    // Dashboards Collection (tenant-scoped)
+    // ========================================================================
+
+    match /dashboards/{dashboardId} {
+      allow read: if canRead(resource.data.tenant_id);
+
+      // Analysts and admins can create and update dashboards
+      allow create, update: if canCreateDashboards(resource.data.tenant_id);
+      allow delete: if isSuperAdmin()
+        || isTenantAdmin(resource.data.tenant_id);
+    }
+
+    // ========================================================================
+    // Syncs Collection (tenant-scoped)
+    // ========================================================================
+
+    match /syncs/{syncId} {
+      allow read: if canRead(resource.data.tenant_id);
+
+      // Operators and admins can manage syncs
+      allow create, update: if canManageSyncsAndPixels(resource.data.tenant_id);
+      allow delete: if isSuperAdmin()
+        || isTenantAdmin(resource.data.tenant_id);
+    }
+
+    // ========================================================================
+    // Resolution Log (tenant-scoped) — server-only writes
+    // ========================================================================
+
+    match /resolution_log/{logId} {
+      allow read: if canRead(resource.data.tenant_id);
+      allow create, update: if isServer();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ========================================================================
+    // Default: deny everything else
+    // ========================================================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
