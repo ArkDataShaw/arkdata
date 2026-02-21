@@ -67,6 +67,21 @@ async function getTenantCollection(collectionName: string) {
   return collection(db, 'tenants', tenantId, collectionName);
 }
 
+/** Race a Firestore query against a timeout — returns empty array if Firestore hangs */
+const QUERY_TIMEOUT_MS = 5_000;
+
+function withTimeout<T>(promise: Promise<T>, fallback: T, label?: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) =>
+      setTimeout(() => {
+        console.warn(`[Firestore] ⏰ ${label ?? 'query'} timed out after ${QUERY_TIMEOUT_MS}ms — returning fallback`);
+        resolve(fallback);
+      }, QUERY_TIMEOUT_MS)
+    ),
+  ]);
+}
+
 /** Convert Firestore doc to plain object with id */
 function docToObject<T>(docSnap: { id: string; data: () => DocumentData }): T {
   return { id: docSnap.id, ...docSnap.data() } as T;
@@ -93,8 +108,8 @@ export function createEntityProxy<T extends DocumentData = DocumentData>(
       }
 
       const q = query(colRef, ...constraints);
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((d) => docToObject<T>(d));
+      const doFetch = getDocs(q).then((snap) => snap.docs.map((d) => docToObject<T>(d)));
+      return withTimeout(doFetch, [] as T[], `${collectionName}.list`);
     },
 
     async filter(
@@ -121,8 +136,8 @@ export function createEntityProxy<T extends DocumentData = DocumentData>(
       }
 
       const q = query(colRef, ...constraints);
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((d) => docToObject<T>(d));
+      const doFetch = getDocs(q).then((snap) => snap.docs.map((d) => docToObject<T>(d)));
+      return withTimeout(doFetch, [] as T[], `${collectionName}.filter`);
     },
 
     async get(id: string): Promise<T | null> {

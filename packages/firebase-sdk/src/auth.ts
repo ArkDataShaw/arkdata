@@ -7,7 +7,8 @@ import {
   updateProfile,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { getAuthInstance } from './config';
+import { getAuthInstance, getDb } from './config';
+import { collection, getDocs, query, limit as firestoreLimit } from 'firebase/firestore';
 import type { UserRole } from '@arkdata/shared-types';
 
 export interface ArkDataUser {
@@ -20,14 +21,48 @@ export interface ArkDataUser {
   created_at?: string;
 }
 
-/** Get current tenant_id from Firebase Auth custom claims */
+/** Wait for Firebase Auth to resolve its initial state (cached after first resolution) */
+let authReadyPromise: Promise<FirebaseUser | null> | null = null;
+
+function waitForAuthReady(): Promise<FirebaseUser | null> {
+  // If user is already available, skip the listener entirely
+  const firebaseAuth = getAuthInstance();
+  if (firebaseAuth.currentUser) return Promise.resolve(firebaseAuth.currentUser);
+
+  // Cache the promise so repeated calls share the same listener
+  if (!authReadyPromise) {
+    authReadyPromise = new Promise((resolve) => {
+      const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+        unsubscribe();
+        resolve(user);
+      });
+    });
+  }
+  return authReadyPromise;
+}
+
+let cachedTenantId: string | null = null;
+let cachedUser: ArkDataUser | null = null;
+let cachedTokenClaims: Record<string, unknown> | null = null;
+
+/** Clear all auth caches (call on logout or user switch) */
+export function clearTenantIdCache(): void {
+  cachedTenantId = null;
+  cachedUser = null;
+  cachedTokenClaims = null;
+  authReadyPromise = null;
+}
+
+/** Get current tenant_id from Firebase Auth custom claims (cached after first call) */
 export async function getTenantId(): Promise<string> {
+  if (cachedTenantId) return cachedTenantId;
   const auth = getAuthInstance();
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
   const token = await user.getIdTokenResult();
   const tenantId = token.claims.tenant_id as string | undefined;
   if (!tenantId) throw new Error('No tenant_id in claims. Contact your admin.');
+  cachedTenantId = tenantId;
   return tenantId;
 }
 
@@ -67,33 +102,59 @@ function firebaseUserToArkData(user: FirebaseUser, claims: Record<string, unknow
 export const auth = {
   /** Get current authenticated user — equivalent to base44.auth.me() */
   async me(): Promise<ArkDataUser> {
-    const firebaseAuth = getAuthInstance();
-    const user = firebaseAuth.currentUser;
+    // Return cached user if available (cleared on logout/sign-in)
+    if (cachedUser) return cachedUser;
+
+    // Wait for Firebase Auth to restore session on initial load
+    const user = await waitForAuthReady();
     if (!user) throw { status: 401, message: 'Not authenticated' };
 
     const tokenResult = await user.getIdTokenResult();
-    return firebaseUserToArkData(user, tokenResult.claims as Record<string, unknown>);
+    cachedTokenClaims = tokenResult.claims as Record<string, unknown>;
+    cachedUser = firebaseUserToArkData(user, cachedTokenClaims);
+    // Also populate tenant cache while we have the claims
+    if (cachedTokenClaims.tenant_id) {
+      cachedTenantId = cachedTokenClaims.tenant_id as string;
+      // Pre-warm the Firestore WebSocket connection so entity queries don't wait 40s+
+      // Fire-and-forget: a tiny read opens the channel in the background
+      const db = getDb();
+      getDocs(query(collection(db, 'tenants', cachedTenantId, '_warmup'), firestoreLimit(1))).catch(() => {});
+    }
+    return cachedUser;
   },
 
   /** Sign in with email/password */
   async signIn(email: string, password: string): Promise<ArkDataUser> {
+    cachedUser = null;
+    cachedTenantId = null;
+    cachedTokenClaims = null;
     const firebaseAuth = getAuthInstance();
     const cred = await signInWithEmailAndPassword(firebaseAuth, email, password);
     const tokenResult = await cred.user.getIdTokenResult();
-    return firebaseUserToArkData(cred.user, tokenResult.claims as Record<string, unknown>);
+    cachedTokenClaims = tokenResult.claims as Record<string, unknown>;
+    cachedUser = firebaseUserToArkData(cred.user, cachedTokenClaims);
+    if (cachedTokenClaims.tenant_id) cachedTenantId = cachedTokenClaims.tenant_id as string;
+    return cachedUser;
   },
 
   /** Sign in with Google OAuth */
   async signInWithGoogle(): Promise<ArkDataUser> {
+    cachedUser = null;
+    cachedTenantId = null;
+    cachedTokenClaims = null;
     const firebaseAuth = getAuthInstance();
     const provider = new GoogleAuthProvider();
     const cred = await signInWithPopup(firebaseAuth, provider);
     const tokenResult = await cred.user.getIdTokenResult();
-    return firebaseUserToArkData(cred.user, tokenResult.claims as Record<string, unknown>);
+    cachedTokenClaims = tokenResult.claims as Record<string, unknown>;
+    cachedUser = firebaseUserToArkData(cred.user, cachedTokenClaims);
+    if (cachedTokenClaims.tenant_id) cachedTenantId = cachedTokenClaims.tenant_id as string;
+    return cachedUser;
   },
 
   /** Sign out — equivalent to base44.auth.logout(redirectUrl?) */
   logout(redirectUrl?: string): void {
+    cachedTenantId = null;
     const firebaseAuth = getAuthInstance();
     firebaseSignOut(firebaseAuth).then(() => {
       if (redirectUrl) {

@@ -15,7 +15,7 @@
  */
 
 export { initializeFirebase, getDb, getAuthInstance } from './config';
-export { auth, getTenantId, getUserRole, type ArkDataUser } from './auth';
+export { auth, getTenantId, getUserRole, clearTenantIdCache, type ArkDataUser } from './auth';
 export { createEntityProxy, type EntityProxy } from './entities';
 import { createEntityProxy } from './entities';
 import { auth } from './auth';

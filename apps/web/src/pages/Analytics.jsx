@@ -148,8 +148,8 @@ export default function Analytics() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-h2">Analytics</h1>
-        <p className="text-white mt-1">Deep insights into your traffic and identification</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Analytics</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Deep insights into your traffic and identification</p>
       </div>
 
       <AnalyticsFilters

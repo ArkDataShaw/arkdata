@@ -155,8 +155,8 @@
     --error-600: 0 70% 35%;
   }
 
-  /* Force dark theme globally (no light mode toggle needed initially) */
-  html {
+  /* Respect light/dark mode toggle */
+  html.dark {
     color-scheme: dark;
   }
 }

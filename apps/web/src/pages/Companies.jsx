@@ -75,7 +75,7 @@ export default function Companies() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Companies</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Companies</h1>
           <p className="text-sm text-slate-500 mt-1">{filtered.length} companies identified</p>
         </div>
         <Button variant="outline" size="sm" className="gap-2">

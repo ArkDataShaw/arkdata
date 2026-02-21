@@ -40,21 +40,20 @@ export default function Billing() {
     : null;
 
   return (
-    <div className="p-8">
-      <div className="max-w-5xl mx-auto">
+    <div className="p-6 space-y-5">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
             Billing & Payments
           </h1>
-          <p className="text-slate-600 dark:text-slate-400">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Manage your subscription and payment method
           </p>
         </div>
 
         {/* Trial Banner */}
         {billingState?.billing_status === "trialing" && daysRemaining !== null && (
-          <Card className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
+          <Card className="mt-5 border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
             <CardContent className="p-4 flex items-start justify-between">
               <div className="flex gap-3">
                 <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
@@ -112,7 +111,6 @@ export default function Billing() {
             <BillingInvoices billingState={billingState} />
           </TabsContent>
         </Tabs>
-      </div>
     </div>
   );
 }

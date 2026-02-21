@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
 import { PubSub } from '@google-cloud/pubsub';
-import type { RawEvent, Pixel } from '@arkdata/shared-types';
+import type { Pixel } from '@arkdata/shared-types';
 import { IngestRequestSchema } from '../validators/event';
 import { coalesceUpsert } from './upsert';
 
@@ -21,7 +21,7 @@ const RAW_EVENTS_TOPIC = 'raw-events';
  * Returns { processed: number } on success.
  */
 export async function ingestHandler(req: Request, res: Response): Promise<void> {
-  const pixelId = req.params.pixelId;
+  const pixelId = req.params.pixelId as string;
 
   // pixelConfig is attached by the auth middleware
   const pixelConfig = (req as any).pixelConfig as Pixel & { id: string };
@@ -61,30 +61,32 @@ export async function ingestHandler(req: Request, res: Response): Promise<void> 
     try {
       // --- 1. Build RawEvent document ---
       const eventRef = eventsCollection.doc(); // auto-generate ID
-      const rawEvent: RawEvent = {
+      const rawEvent: Record<string, unknown> = {
         id: eventRef.id,
         tenant_id: tenantId,
         pixel_id: pixelId,
         event_type: event.type,
         url: event.url,
-        referrer: event.referrer,
-        time_on_page_sec: event.time_on_page_sec,
-        scroll_depth: event.scroll_depth,
-        element_id: event.element_id,
-        element_text: event.element_text,
         event_timestamp: now,
-        metadata: event.metadata,
-        resolution: event.resolution,
         created_at: now,
         updated_at: now,
       };
+
+      // Only include optional fields if they have values (Firestore rejects undefined)
+      if (event.referrer !== undefined) rawEvent.referrer = event.referrer;
+      if (event.time_on_page_sec !== undefined) rawEvent.time_on_page_sec = event.time_on_page_sec;
+      if (event.scroll_depth !== undefined) rawEvent.scroll_depth = event.scroll_depth;
+      if (event.element_id !== undefined) rawEvent.element_id = event.element_id;
+      if (event.element_text !== undefined) rawEvent.element_text = event.element_text;
+      if (event.metadata !== undefined) rawEvent.metadata = event.metadata;
+      if (event.resolution !== undefined) rawEvent.resolution = event.resolution;
 
       // --- 2. Write to Firestore (append-only) ---
       await eventRef.set(rawEvent);
 
       // --- 3. Publish to Pub/Sub for downstream pipelines ---
       const messagePayload = JSON.stringify({
-        event_id: rawEvent.id,
+        event_id: eventRef.id,
         tenant_id: tenantId,
         pixel_id: pixelId,
         event_type: event.type,
@@ -100,7 +102,7 @@ export async function ingestHandler(req: Request, res: Response): Promise<void> 
         const visitorId = await coalesceUpsert(
           tenantId,
           event.resolution as Record<string, unknown>,
-          rawEvent.id,
+          eventRef.id,
         );
 
         // Back-link event to visitor

@@ -1,4 +1,5 @@
 import type { TenantEntity, IdentityStatus, VisitorStatus, PaginatedResponse } from './common';
+import type { VisitorEvent } from './event';
 
 /** Core visitor profile — idempotent, upserted via COALESCE pattern */
 export interface Visitor extends TenantEntity {
@@ -95,5 +96,3 @@ export interface VisitorRow {
 /** Paginated visitor response */
 export type VisitorPage = PaginatedResponse<VisitorRow>;
 
-/** Re-export for component compatibility */
-export type { VisitorEvent } from './event';

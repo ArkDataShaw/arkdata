@@ -12,7 +12,7 @@ initializeApp({ credential: applicationDefault() });
 // ---------------------------------------------------------------------------
 // Express app
 // ---------------------------------------------------------------------------
-const app = express();
+const app: ReturnType<typeof express> = express();
 const PORT = parseInt(process.env.PORT ?? '8080', 10);
 
 // --- Global middleware ---
@@ -51,4 +51,4 @@ app.listen(PORT, () => {
   console.log(`[pixel-ingest] Listening on port ${PORT}`);
 });
 
-export default app;
+export { app };

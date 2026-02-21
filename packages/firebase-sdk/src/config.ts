@@ -1,6 +1,6 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from 'firebase/firestore';
 
 let app: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
@@ -18,7 +18,11 @@ export function initializeFirebase(config?: Record<string, string>) {
 
   app = initializeApp(firebaseConfig);
   authInstance = getAuth(app);
-  dbInstance = getFirestore(app);
+  // Use persistent local cache with multi-tab support — serves cached data
+  // instantly on repeat visits and avoids Firestore cold-connect delays
+  dbInstance = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
 
   return { app, auth: authInstance, db: dbInstance };
 }

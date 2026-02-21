@@ -38,8 +38,8 @@ export default function NotificationManager({ currentUser }) {
         // Test notification
         new Notification("Notifications Enabled", {
           body: "You'll now receive important updates from Ark Data",
-          icon: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69899db1dffa2f0b930dfd60/4aeee1040_image.png",
-          badge: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69899db1dffa2f0b930dfd60/4aeee1040_image.png"
+          icon: "/logo.png",
+          badge: "/logo.png"
         });
       }
     }
@@ -59,8 +59,8 @@ export default function NotificationManager({ currentUser }) {
     if (permission === "granted" && enabled) {
       const notification = new Notification(data.title, {
         body: data.body,
-        icon: data.icon || "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69899db1dffa2f0b930dfd60/4aeee1040_image.png",
-        badge: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69899db1dffa2f0b930dfd60/4aeee1040_image.png",
+        icon: data.icon || "/logo.png",
+        badge: "/logo.png",
         tag: data.type,
         requireInteraction: data.type === "visitor_identified" || data.type === "rule_triggered"
       });

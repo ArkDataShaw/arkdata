@@ -22,7 +22,7 @@ export async function validatePixelKey(
     return;
   }
 
-  const pixelId = req.params.pixelId;
+  const pixelId = req.params.pixelId as string;
   if (!pixelId) {
     res.status(400).json({ error: 'Missing pixelId path parameter.' });
     return;
