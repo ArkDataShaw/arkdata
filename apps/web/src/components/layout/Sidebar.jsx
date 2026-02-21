@@ -4,7 +4,7 @@ import { createPageUrl } from "@/utils";
 import {
   Home, Users, Building2, Activity, AlertTriangle, BarChart3,
   Plug, GitBranch, FileText, Settings, ChevronLeft, ChevronRight,
-  Shield, Database, BookOpen, Flag, Lock, Layers, Target, CreditCard
+  Shield, Database, BookOpen, Flag, Lock, Layers, Target, CreditCard, CodeXml
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +22,7 @@ const customerNav = [
   { label: "Automations", icon: GitBranch, page: "Automations" },
   { label: "Reports", icon: FileText, page: "Reports" },
   { label: "Billing", icon: CreditCard, page: "Billing" },
-  { label: "Settings", icon: Settings, page: "AppSettings" },
+  { label: "Pixel", icon: CodeXml, page: "AppSettings" },
 ];
 
 const adminNav = [
