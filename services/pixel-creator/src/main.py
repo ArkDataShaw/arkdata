@@ -40,6 +40,7 @@ app = FastAPI(title="Pixel Creator", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://app.arkdata.io",
         "https://arkdata-hub.web.app",
         "https://arkdata-hub.firebaseapp.com",
         "http://localhost:5173",
