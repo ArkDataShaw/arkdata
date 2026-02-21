@@ -13,12 +13,15 @@ import {
 import StatusBadge from "@/components/shared/StatusBadge";
 import moment from "moment";
 
+// --- Pixel Creator API config ---
+const PIXEL_CREATOR_URL = import.meta.env.VITE_PIXEL_CREATOR_URL || "http://localhost:8081";
+const PIXEL_CREATOR_API_KEY = import.meta.env.VITE_PIXEL_CREATOR_API_KEY || "";
+
 // --- Staged messages for the creating interstitial ---
 const CREATING_MESSAGES = [
   { text: "Creating your pixel...", delay: 0 },
-  { text: "Configuring tracking parameters...", delay: 5000 },
-  { text: "Generating your pixel snippet...", delay: 15000 },
-  { text: "Almost there...", delay: 30000 },
+  { text: "Generating snippet...", delay: 3000 },
+  { text: "Almost there...", delay: 6000 },
 ];
 
 // --- Creating Interstitial Screen ---
@@ -39,20 +42,23 @@ function CreatingInterstitial() {
         {CREATING_MESSAGES[messageIndex].text}
       </p>
       <p className="text-sm text-slate-400 dark:text-slate-500">
-        This usually takes 15–30 seconds
+        This usually takes a few seconds
       </p>
     </div>
   );
 }
 
 // --- Install Content (reused in both Create modal step 2 and Install modal) ---
-function InstallContent({ pixelId, onFinish }) {
+function InstallContent({ pixelId, realPixelCode, onFinish }) {
   const [installMethod, setInstallMethod] = useState("basic");
   const [ga4Id, setGa4Id] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const basicSnippet = `<script src="https://cdn.arkdata.io/pixels/${pixelId}/p.js" async></script>`;
-  const gaSnippet = `<script src="https://cdn.arkdata.io/pixels/${pixelId}/p.js" data-ga4-key="${ga4Id || "YOUR_GA_TRACKING_ID"}" async></script>`;
+  // Use the real pixel code from IntentCore — no fallback to a fake URL
+  const basicSnippet = realPixelCode || "Pixel code unavailable — please recreate the pixel.";
+  const gaSnippet = realPixelCode
+    ? realPixelCode.replace(/(async|defer)/, `data-ga4-key="${ga4Id || "YOUR_GA_TRACKING_ID"}" $1`)
+    : basicSnippet;
   const snippet = installMethod === "basic" ? basicSnippet : gaSnippet;
 
   const copySnippet = () => {
@@ -157,19 +163,14 @@ function InstallContent({ pixelId, onFinish }) {
         </button>
       </div>
 
-      {/* Verify */}
-      <div className="border-t border-slate-100 dark:border-slate-800 pt-5 space-y-2">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-          Verify Installation
-        </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          After installing the pixel script on your website, verify that it's working correctly
-          by checking for recent events. It may take a minute or two for events to start appearing.
-        </p>
-        <Button variant="outline" className="w-full mt-2">
-          Check Installation
-        </Button>
-      </div>
+      {/* GA4 Note */}
+      {installMethod === "ga" && (
+        <div className="rounded-lg border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-3">
+          <p className="text-sm text-yellow-800 dark:text-yellow-300">
+            <span className="font-bold">Note:</span> Remember to replace "YOUR_GA_TRACKING_ID" with your actual GA4 tracking ID in the script.
+          </p>
+        </div>
+      )}
 
       {/* Finish */}
       <div className="flex justify-end pt-2">
@@ -225,12 +226,14 @@ const WIZARD_STEPS = [
 ];
 
 // --- Create Pixel Modal ---
-function CreatePixelModal({ open, onOpenChange, onPixelCreating }) {
+function CreatePixelModal({ open, onOpenChange, onPixelCreating, onPixelCreated }) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [creating, setCreating] = useState(false);
   const [createdPixelId, setCreatedPixelId] = useState(null);
+  const [realPixelCode, setRealPixelCode] = useState(null);
+  const [error, setError] = useState(null);
 
   const reset = () => {
     setStep(1);
@@ -238,12 +241,12 @@ function CreatePixelModal({ open, onOpenChange, onPixelCreating }) {
     setUrl("");
     setCreating(false);
     setCreatedPixelId(null);
+    setRealPixelCode(null);
+    setError(null);
   };
 
   const handleOpenChange = (val) => {
-    // Block closing during creation
     if (creating && !val) {
-      // Allow close — pixel goes to "creating" state in table
       onOpenChange(val);
       return;
     }
@@ -251,12 +254,13 @@ function CreatePixelModal({ open, onOpenChange, onPixelCreating }) {
     onOpenChange(val);
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     setCreating(true);
+    setError(null);
 
-    // Add pixel to table immediately as "creating"
+    const pendingId = `pending-${Date.now()}`;
     const pendingPixel = {
-      id: `pending-${Date.now()}`,
+      id: pendingId,
       name: name.trim(),
       domain: url.trim(),
       status: "creating",
@@ -264,12 +268,50 @@ function CreatePixelModal({ open, onOpenChange, onPixelCreating }) {
     };
     onPixelCreating(pendingPixel);
 
-    // Simulate backend pixel creation (replace with real API call later)
-    setTimeout(() => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+      const res = await fetch(`${PIXEL_CREATOR_URL}/api/create-pixel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Api-Key": PIXEL_CREATOR_API_KEY,
+        },
+        body: JSON.stringify({ name: name.trim(), url: url.trim() }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`Server error (${res.status})`);
+      }
+
+      const data = await res.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Pixel creation failed");
+      }
+
       setCreating(false);
-      setCreatedPixelId("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
+      setCreatedPixelId(data.pixel_id || "unknown");
+      setRealPixelCode(data.pixel_code);
       setStep(2);
-    }, 20000);
+
+      // Notify parent to update pending pixel to active
+      onPixelCreated(pendingId, {
+        pixel_public_id: data.pixel_id,
+        snippet_code: data.pixel_code,
+        status: "active",
+      });
+    } catch (err) {
+      setCreating(false);
+      const msg = err.name === "AbortError"
+        ? "Request timed out — please try again"
+        : (err.message || "Network error — please try again");
+      setError(msg);
+      // Remove the pending pixel from the table on failure
+      onPixelCreated(pendingId, null);
+    }
   };
 
   return (
@@ -297,6 +339,11 @@ function CreatePixelModal({ open, onOpenChange, onPixelCreating }) {
             <div className="px-6 pb-6">
               {step === 1 && (
                 <div className="space-y-5">
+                  {error && (
+                    <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3">
+                      <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm font-semibold text-slate-900 dark:text-slate-100 block mb-2">
                       Website Name
@@ -324,7 +371,7 @@ function CreatePixelModal({ open, onOpenChange, onPixelCreating }) {
                       disabled={!name.trim() || !url.trim()}
                       className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 gap-1.5"
                     >
-                      Create
+                      {error ? "Retry" : "Create"}
                     </Button>
                   </div>
                 </div>
@@ -333,6 +380,7 @@ function CreatePixelModal({ open, onOpenChange, onPixelCreating }) {
               {step === 2 && createdPixelId && (
                 <InstallContent
                   pixelId={createdPixelId}
+                  realPixelCode={realPixelCode}
                   onFinish={() => handleOpenChange(false)}
                 />
               )}
@@ -366,6 +414,7 @@ function InstallPixelModal({ open, onOpenChange, pixel }) {
         <div className="px-6 pb-6">
           <InstallContent
             pixelId={pixelId}
+            realPixelCode={pixel.snippet_code || null}
             onFinish={() => onOpenChange(false)}
           />
         </div>
@@ -423,14 +472,21 @@ export default function AppSettings() {
 
   const handlePixelCreating = useCallback((pixel) => {
     setPendingPixels(prev => [pixel, ...prev]);
-
-    // Simulate auto-update to active after creation completes
-    setTimeout(() => {
-      setPendingPixels(prev =>
-        prev.map(p => p.id === pixel.id ? { ...p, status: "active" } : p)
-      );
-    }, 25000);
   }, []);
+
+  const handlePixelCreated = useCallback((pendingId, result) => {
+    if (!result) {
+      // Creation failed — remove pending pixel
+      setPendingPixels(prev => prev.filter(p => p.id !== pendingId));
+      return;
+    }
+    // Update pending pixel to active with real data
+    setPendingPixels(prev =>
+      prev.map(p => p.id === pendingId ? { ...p, ...result } : p)
+    );
+    // Refresh domains from Firestore
+    queryClient.invalidateQueries({ queryKey: ["domains"] });
+  }, [queryClient]);
 
   const toggleSort = (field) => {
     if (sortField === field) {
@@ -567,6 +623,7 @@ export default function AppSettings() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onPixelCreating={handlePixelCreating}
+        onPixelCreated={handlePixelCreated}
       />
 
       <InstallPixelModal
