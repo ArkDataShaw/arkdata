@@ -4,6 +4,8 @@ FastAPI service for creating IntentCore pixels via Selenium.
 Pre-warms browser sessions so user-facing latency is ~3-5s instead of 13s.
 """
 
+from __future__ import annotations
+
 import logging
 from contextlib import asynccontextmanager
 
@@ -37,7 +39,11 @@ app = FastAPI(title="Pixel Creator", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://arkdata-hub.web.app",
+        "https://arkdata-hub.firebaseapp.com",
+        "http://localhost:5173",
+    ],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
