@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/AuthContext";
+import { doc, getDoc } from "firebase/firestore";
+import { getDb } from "@arkdata/firebase-sdk";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,20 +16,29 @@ import BillingInvoices from "@/components/billing/BillingInvoices";
 
 export default function Billing() {
   const [activeTab, setActiveTab] = useState("overview");
+  const { user } = useAuth();
+  const tenantId = user?.tenant_id;
 
   const { data: billingState } = useQuery({
-    queryKey: ["billing-state"],
+    queryKey: ["billing-state", tenantId],
     queryFn: async () => {
-      const user = await base44.auth.me();
-      // Fetch from your backend API
+      const db = getDb();
+      const tenantSnap = await getDoc(doc(db, "tenants", tenantId));
+      const tenant = tenantSnap.exists() ? tenantSnap.data() : null;
+
+      const isTrial = tenant?.plan === "trial" || tenant?.status === "trial";
+      const trialExpiresAt = tenant?.trial_expires_at ? new Date(tenant.trial_expires_at) : null;
+      const createdAt = tenant?.created_at?.toDate ? tenant.created_at.toDate() : tenant?.created_at ? new Date(tenant.created_at) : null;
+
       return {
-        tenant_id: user.tenant_id || "demo",
-        trial_started_at: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000),
-        trial_ends_at: new Date(Date.now() + 18 * 24 * 60 * 60 * 1000),
-        billing_status: "trialing",
-        plan_key: "recaptured_usage",
+        tenant_id: tenantId,
+        trial_started_at: createdAt,
+        trial_ends_at: trialExpiresAt,
+        billing_status: isTrial ? "trialing" : "active",
+        plan_key: tenant?.plan || "trial",
       };
     },
+    enabled: !!tenantId,
   });
 
   const daysRemaining = billingState?.trial_ends_at
