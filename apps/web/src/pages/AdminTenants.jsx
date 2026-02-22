@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { listAllTenants, createTenantFn } from "@arkdata/firebase-sdk";
+import { listAllTenants, createTenantFn, getDb } from "@arkdata/firebase-sdk";
+import { collection, getDocs } from "firebase/firestore";
 import { Layers, Plus, Search, Users, Globe, Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,27 @@ export default function AdminTenants() {
   const { data: tenants = [], isLoading } = useQuery({
     queryKey: ["admin-tenants"],
     queryFn: () => listAllTenants(),
+  });
+
+  // Fetch actual domain counts per tenant
+  const { data: domainCounts = {} } = useQuery({
+    queryKey: ["admin-tenant-domain-counts", tenants.map((t) => t.id).join(",")],
+    enabled: tenants.length > 0,
+    queryFn: async () => {
+      const db = getDb();
+      const counts = {};
+      await Promise.all(
+        tenants.map(async (t) => {
+          try {
+            const snap = await getDocs(collection(db, "tenants", t.id, "domains"));
+            counts[t.id] = snap.size;
+          } catch {
+            counts[t.id] = 0;
+          }
+        })
+      );
+      return counts;
+    },
   });
 
   const createMutation = useMutation({
@@ -126,7 +148,7 @@ export default function AdminTenants() {
                         <Layers className="w-5 h-5 text-indigo-500" />
                       </div>
                       <div>
-                        <p className="font-semibold text-slate-900">{tenant.name}</p>
+                        <p className="font-semibold text-slate-900 dark:text-white">{tenant.name}</p>
                         <p className="text-xs text-slate-400">ID: {tenant.id?.slice(0, 8)}</p>
                       </div>
                     </div>
@@ -142,7 +164,7 @@ export default function AdminTenants() {
                     </span>
                     <span className="flex items-center gap-1">
                       <Globe className="w-3.5 h-3.5" />
-                      {tenant.domain_count || 0} domains
+                      {domainCounts[tenant.id] ?? tenant.domain_count ?? 0} domains
                     </span>
                     <span className="flex items-center gap-1 ml-auto">
                       <Calendar className="w-3.5 h-3.5" />
