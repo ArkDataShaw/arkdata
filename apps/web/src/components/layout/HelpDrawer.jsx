@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { X, Search, BookOpen, ExternalLink, MessageCircle, AlertCircle } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import {
+  X, Search, BookOpen, ExternalLink, MessageCircle, AlertCircle,
+  Lightbulb, MessageSquare, CheckCircle2, Clock, ChevronRight,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,19 +15,41 @@ import ReactMarkdown from "react-markdown";
 import { motion, AnimatePresence } from "framer-motion";
 import FeedbackSubmissionForm from "@/components/feedback/FeedbackSubmissionForm";
 
+const typeIcons = {
+  bug: <AlertCircle className="w-3.5 h-3.5" />,
+  feature_request: <Lightbulb className="w-3.5 h-3.5" />,
+  general_feedback: <MessageSquare className="w-3.5 h-3.5" />,
+};
+
+const statusColors = {
+  new: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  in_review: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
+  planned: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
+  under_consideration: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+};
+
 export default function HelpDrawer({ open, onClose }) {
+  const { user } = useAuth();
   const [articles, setArticles] = useState([]);
   const [settings, setSettings] = useState(null);
   const [search, setSearch] = useState("");
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [tickets, setTickets] = useState([]);
+
+  const isAdmin = user?.role === "super_admin" || user?.role === "tenant_admin";
 
   useEffect(() => {
     if (open) {
       base44.entities.HelpArticle.list().then(setArticles).catch(() => {});
       base44.entities.HelpSettings.list().then(s => setSettings(s[0])).catch(() => {});
+      if (isAdmin) {
+        base44.entities.Feedback.list("-created_date", 100)
+          .then((all) => setTickets(all.filter((fb) => fb.status !== "completed" && fb.status !== "dismissed")))
+          .catch(() => {});
+      }
     }
-  }, [open]);
+  }, [open, isAdmin]);
 
   const filtered = articles.filter(a =>
     a.is_published && a.title?.toLowerCase().includes(search.toLowerCase())
@@ -125,6 +153,61 @@ export default function HelpDrawer({ open, onClose }) {
                       <MessageCircle className="w-4 h-4" />
                     </button>
                   </div>
+
+                  {/* Admin Tickets */}
+                  {isAdmin && tickets.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">
+                          Open Tickets ({tickets.length})
+                        </p>
+                        <Link
+                          to={createPageUrl("AdminFeedback")}
+                          onClick={onClose}
+                          className="text-xs text-violet-600 dark:text-violet-400 hover:underline"
+                        >
+                          View All
+                        </Link>
+                      </div>
+                      <div className="space-y-1.5">
+                        {tickets.slice(0, 5).map((ticket) => (
+                          <Link
+                            key={ticket.id}
+                            to={createPageUrl("AdminFeedback")}
+                            onClick={onClose}
+                            className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group"
+                          >
+                            <div className="text-slate-400 dark:text-slate-500 mt-0.5 flex-shrink-0">
+                              {typeIcons[ticket.type] || <MessageSquare className="w-3.5 h-3.5" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
+                                {ticket.title}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[ticket.status] || statusColors.new}`}>
+                                  {(ticket.status || "new").replace(/_/g, " ")}
+                                </Badge>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                                  {ticket.user_email}
+                                </span>
+                              </div>
+                            </div>
+                            <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 mt-1 flex-shrink-0 group-hover:text-slate-500" />
+                          </Link>
+                        ))}
+                        {tickets.length > 5 && (
+                          <Link
+                            to={createPageUrl("AdminFeedback")}
+                            onClick={onClose}
+                            className="block text-center text-xs text-violet-600 dark:text-violet-400 hover:underline py-2"
+                          >
+                            +{tickets.length - 5} more tickets
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Articles */}
                   <div>
