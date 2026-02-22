@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import {
-  Search, Bell, HelpCircle, Calendar, ChevronDown, LogOut, User, Shield, Moon, Sun
+  Search, HelpCircle, Calendar, ChevronDown, LogOut, User, Moon, Sun
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import NotificationManager from "@/components/notifications/NotificationManager";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -17,8 +16,7 @@ import {
   Popover, PopoverContent, PopoverTrigger
 } from "@/components/ui/popover";
 
-export default function TopBar({ onHelpClick, isAdmin, children }) {
-  const navigate = useNavigate();
+export default function TopBar({ onHelpClick, children }) {
   const [user, setUser] = useState(null);
   const [dateRange, setDateRange] = useState("Last 7 days");
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,8 +46,7 @@ export default function TopBar({ onHelpClick, isAdmin, children }) {
       {children}
       
       {/* Date Range */}
-      {!isAdmin && (
-        <Popover>
+      <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 h-9">
               <Calendar className="w-3.5 h-3.5" />
@@ -71,14 +68,13 @@ export default function TopBar({ onHelpClick, isAdmin, children }) {
             ))}
           </PopoverContent>
         </Popover>
-      )}
 
       {/* Search */}
       <div className="flex-1 max-w-md hidden md:block">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
-            placeholder={isAdmin ? "Search tenants, users..." : "Search people, companies, pages..."}
+            placeholder="Search people, companies, pages..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm"
@@ -104,20 +100,6 @@ export default function TopBar({ onHelpClick, isAdmin, children }) {
         <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 dark:text-slate-400" onClick={onHelpClick}>
           <HelpCircle className="w-4 h-4" />
         </Button>
-
-        {/* Admin toggle */}
-        {user?.role === "admin" && (
-          <Link to={createPageUrl(isAdmin ? "Home" : "AdminTenants")} className="hidden md:block">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-9 gap-1.5 bg-violet-50 dark:bg-violet-950 border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span className="text-xs font-medium">{isAdmin ? "View Customer App" : "View Admin Portal"}</span>
-            </Button>
-          </Link>
-        )}
 
         {/* User Menu */}
         <DropdownMenu>

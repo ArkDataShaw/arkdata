@@ -61,9 +61,11 @@ import AdminOnboardingBuilder from './pages/AdminOnboardingBuilder';
 import AdminOnboardingSupport from './pages/AdminOnboardingSupport';
 import AdminPipeline from './pages/AdminPipeline';
 import AdminSecurity from './pages/AdminSecurity';
+import AdminTenantDetail from './pages/AdminTenantDetail';
 import AdminTenants from './pages/AdminTenants';
 import AdminUIBuilder from './pages/AdminUIBuilder';
 import AdminUIConfig from './pages/AdminUIConfig';
+import AdminUserDetail from './pages/AdminUserDetail';
 import AdminUsers from './pages/AdminUsers';
 import AdminWorkflows from './pages/AdminWorkflows';
 import AdvancedAnalytics from './pages/AdvancedAnalytics';
@@ -84,6 +86,7 @@ import Profile from './pages/Profile';
 import Reports from './pages/Reports';
 import SegmentBuilder from './pages/SegmentBuilder';
 import Sessions from './pages/Sessions';
+import TeamMembers from './pages/TeamMembers';
 import VisitorDetail from './pages/VisitorDetail';
 import Visitors from './pages/Visitors';
 import Analytics from './pages/Analytics';
@@ -105,9 +108,11 @@ export const PAGES = {
     "AdminOnboardingSupport": AdminOnboardingSupport,
     "AdminPipeline": AdminPipeline,
     "AdminSecurity": AdminSecurity,
+    "AdminTenantDetail": AdminTenantDetail,
     "AdminTenants": AdminTenants,
     "AdminUIBuilder": AdminUIBuilder,
     "AdminUIConfig": AdminUIConfig,
+    "AdminUserDetail": AdminUserDetail,
     "AdminUsers": AdminUsers,
     "AdminWorkflows": AdminWorkflows,
     "AdvancedAnalytics": AdvancedAnalytics,
@@ -128,6 +133,7 @@ export const PAGES = {
     "Reports": Reports,
     "SegmentBuilder": SegmentBuilder,
     "Sessions": Sessions,
+    "TeamMembers": TeamMembers,
     "VisitorDetail": VisitorDetail,
     "Visitors": Visitors,
     "Analytics": Analytics,

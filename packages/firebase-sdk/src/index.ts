@@ -17,6 +17,15 @@
 export { initializeFirebase, getDb, getAuthInstance } from './config';
 export { auth, getTenantId, getUserRole, clearTenantIdCache, type ArkDataUser } from './auth';
 export { createEntityProxy, type EntityProxy } from './entities';
+export { listAllTenants, getTenant, listTenantUsers, listMyTeamUsers } from './admin';
+export {
+  createTenantFn,
+  inviteUserFn,
+  updateUserRoleFn,
+  deleteTenantUser,
+  updateTenantLimitsFn,
+  impersonateUserFn,
+} from './functions';
 import { createEntityProxy } from './entities';
 import { auth } from './auth';
 

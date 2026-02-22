@@ -85,7 +85,7 @@ service cloud.firestore {
     // ========================================================================
 
     match /tenants/{tenantId} {
-      // super_admin can read/write all tenants
+      // super_admin can read/write ALL tenants (cross-tenant access for admin panel)
       // tenant_admin can read own tenant, update settings
       // all tenant members can read their own tenant
       allow read: if isSuperAdmin() || isTenantMember(tenantId);
@@ -94,10 +94,24 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
 
       // ---- Users sub-collection ----
+      // super_admin can read/write users in ANY tenant (cross-tenant admin)
       match /users/{userId} {
-        allow read: if canRead(tenantId);
-        allow create, update: if canWrite(tenantId);
+        allow read: if isSuperAdmin() || canRead(tenantId);
+        allow create, update: if isSuperAdmin() || canWrite(tenantId);
         allow delete: if isSuperAdmin() || isTenantAdmin(tenantId);
+      }
+
+      // ---- Domains (Pixels) sub-collection ----
+      match /domains/{domainId} {
+        allow read: if isSuperAdmin() || canRead(tenantId);
+        allow create, update: if isSuperAdmin() || canManageSyncsAndPixels(tenantId);
+        allow delete: if isSuperAdmin() || isTenantAdmin(tenantId);
+      }
+
+      // ---- All other tenant subcollections (catch-all for admin) ----
+      match /{subcollection}/{docId} {
+        allow read: if isSuperAdmin() || canRead(tenantId);
+        allow write: if isSuperAdmin() || canWrite(tenantId);
       }
     }
 

@@ -298,15 +298,20 @@ def fill_and_create(session: WarmSession, name: str, url: str) -> tuple[str, str
         except Exception:
             driver.execute_script("arguments[0].click();", final_create)
 
+        # Wait for post-creation UI to settle
+        time.sleep(2)
+
         # Navigate to Install tab
-        time.sleep(0.3)
         try:
-            install_tab = driver.find_element(
-                By.XPATH, "//button[contains(normalize-space(.),'Install')]"
+            install_tab = wait.until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//button[contains(normalize-space(.),'Install')]")
+                )
             )
             driver.execute_script("arguments[0].click();", install_tab)
-        except Exception:
-            pass
+            logger.info("Clicked Install tab")
+        except Exception as e:
+            logger.warning(f"Install tab not found: {e}")
 
         # Click Basic Install
         time.sleep(1)
@@ -315,17 +320,30 @@ def fill_and_create(session: WarmSession, name: str, url: str) -> tuple[str, str
                 By.XPATH, "//button[contains(normalize-space(.),'Basic Install')]"
             )
             driver.execute_script("arguments[0].click();", basic_btn)
+            logger.info("Clicked Basic Install")
         except Exception:
-            pass
+            logger.warning("Basic Install button not found")
 
-        # Extract pixel code
-        time.sleep(1)
-        pixel_code = _extract_pixel_code(driver)
+        # Extract pixel code with retries
+        pixel_code = ""
+        for attempt in range(5):
+            time.sleep(1)
+            pixel_code = _extract_pixel_code(driver)
+            if pixel_code and "<script" in pixel_code.lower():
+                break
+            logger.info(f"Extraction attempt {attempt + 1}/5 — no code yet")
 
         elapsed = int((time.perf_counter() - t0) * 1000)
         logger.info(f"fill_and_create completed in {elapsed}ms")
 
         if not pixel_code or "<script" not in pixel_code.lower():
+            # Save screenshot for debugging
+            try:
+                driver.save_screenshot("/tmp/pixel-creator-fail.png")
+                page_text = driver.execute_script("return document.body.innerText.substring(0, 500);")
+                logger.error(f"Page text at failure: {page_text}")
+            except Exception:
+                pass
             raise RuntimeError(
                 f"Pixel code not found after creation. Got: {pixel_code[:200] if pixel_code else '(empty)'}"
             )

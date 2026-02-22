@@ -1,4 +1,8 @@
 {
+  "functions": {
+    "source": "infra/functions",
+    "runtime": "nodejs20"
+  },
   "firestore": {
     "rules": "infra/firestore-rules/firestore.rules",
     "indexes": "infra/firestore-rules/firestore.indexes.json"
@@ -16,6 +20,9 @@
   "emulators": {
     "auth": {
       "port": 9099
+    },
+    "functions": {
+      "port": 5001
     },
     "firestore": {
       "port": 8081

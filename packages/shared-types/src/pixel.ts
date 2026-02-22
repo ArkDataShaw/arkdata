@@ -5,9 +5,9 @@ export interface Pixel extends TenantEntity {
   name: string;
   domain: string;
   status: 'active' | 'paused' | 'disabled';
-  webhook_url: string;
   snippet_code: string;
-  pixel_provider: 'simple_audience' | 'custom';
+  pixel_provider: 'intentcore' | 'simple_audience' | 'custom';
+  webhook_url?: string;
   provider_metadata?: {
     segment_id?: string;
     segment_url?: string;

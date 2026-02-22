@@ -17,6 +17,39 @@ import moment from "moment";
 const PIXEL_CREATOR_URL = import.meta.env.VITE_PIXEL_CREATOR_URL || "http://localhost:8081";
 const PIXEL_CREATOR_API_KEY = import.meta.env.VITE_PIXEL_CREATOR_API_KEY || "";
 
+// --- URL validation ---
+function isValidUrl(str) {
+  try {
+    // Must be https:// or no protocol — reject http:// and other protocols
+    if (/^[a-zA-Z]+:\/\//.test(str) && !/^https:\/\//.test(str)) return false;
+    const stripped = str.replace(/^https:\/\//, "").trim().split(/[/?#]/)[0];
+    if (!stripped) return false;
+    const u = new URL(`https://${stripped}`);
+    if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(u.hostname)) return false;
+    // Require a subdomain (e.g. www.test.co, app.test.co) — bare domains like test.co are rejected
+    return u.hostname.split(".").length >= 3;
+  } catch {
+    return false;
+  }
+}
+
+function suggestUrl(str) {
+  // Strip any protocol to get the raw host + path
+  const stripped = str.replace(/^[a-zA-Z]+:\/\//, "").trim().split(/[/?#]/)[0];
+  if (!stripped) return null;
+  // Check it looks like a valid hostname
+  if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(stripped)) return null;
+  // Count domain parts to detect if a subdomain is present
+  // e.g. "app.test.tv" = 3 parts (has subdomain), "test.com" = 2 parts (bare domain)
+  const parts = stripped.split(".");
+  if (parts.length <= 2) {
+    // Bare domain like test.com → suggest www.test.com
+    return `https://www.${stripped}`;
+  }
+  // Already has a subdomain (app.test.tv, www.test.com) → keep it
+  return `https://${stripped}`;
+}
+
 // --- Staged messages for the creating interstitial ---
 const CREATING_MESSAGES = [
   { text: "Creating your pixel...", delay: 0 },
@@ -42,7 +75,7 @@ function CreatingInterstitial() {
         {CREATING_MESSAGES[messageIndex].text}
       </p>
       <p className="text-sm text-slate-400 dark:text-slate-500">
-        This usually takes a few seconds
+        This usually takes 15-30 seconds
       </p>
     </div>
   );
@@ -234,6 +267,7 @@ function CreatePixelModal({ open, onOpenChange, onPixelCreating, onPixelCreated 
   const [createdPixelId, setCreatedPixelId] = useState(null);
   const [realPixelCode, setRealPixelCode] = useState(null);
   const [error, setError] = useState(null);
+  const [urlTouched, setUrlTouched] = useState(false);
 
   const reset = () => {
     setStep(1);
@@ -243,6 +277,7 @@ function CreatePixelModal({ open, onOpenChange, onPixelCreating, onPixelCreated 
     setCreatedPixelId(null);
     setRealPixelCode(null);
     setError(null);
+    setUrlTouched(false);
   };
 
   const handleOpenChange = (val) => {
@@ -255,6 +290,8 @@ function CreatePixelModal({ open, onOpenChange, onPixelCreating, onPixelCreated 
   };
 
   const handleCreate = async () => {
+    setUrlTouched(true);
+    if (!isValidUrl(url.trim())) return;
     setCreating(true);
     setError(null);
 
@@ -292,17 +329,23 @@ function CreatePixelModal({ open, onOpenChange, onPixelCreating, onPixelCreated 
         throw new Error(data.error || "Pixel creation failed");
       }
 
+      // Persist to Firestore
+      const saved = await base44.entities.Domain.create({
+        name: name.trim(),
+        domain: url.trim(),
+        snippet_code: data.pixel_code,
+        pixel_provider: "intentcore",
+        status: "active",
+        event_count: 0,
+      });
+
       setCreating(false);
-      setCreatedPixelId(data.pixel_id || "unknown");
+      setCreatedPixelId(saved.id);
       setRealPixelCode(data.pixel_code);
       setStep(2);
 
-      // Notify parent to update pending pixel to active
-      onPixelCreated(pendingId, {
-        pixel_public_id: data.pixel_id,
-        snippet_code: data.pixel_code,
-        status: "active",
-      });
+      // Notify parent to replace pending pixel with the saved Firestore doc
+      onPixelCreated(pendingId, saved);
     } catch (err) {
       setCreating(false);
       const msg = err.name === "AbortError"
@@ -363,6 +406,24 @@ function CreatePixelModal({ open, onOpenChange, onPixelCreating, onPixelCreated 
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                     />
+                    {urlTouched && url.trim() && !isValidUrl(url.trim()) && (
+                      <div className="mt-1.5">
+                        <p className="text-sm text-red-500">Invalid URL</p>
+                        {suggestUrl(url.trim()) && (
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                            Did you mean{" "}
+                            <button
+                              type="button"
+                              onClick={() => setUrl(suggestUrl(url.trim()))}
+                              className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 underline"
+                            >
+                              {suggestUrl(url.trim())}
+                            </button>
+                            ?
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end pt-2">
@@ -475,17 +536,11 @@ export default function AppSettings() {
   }, []);
 
   const handlePixelCreated = useCallback((pendingId, result) => {
-    if (!result) {
-      // Creation failed — remove pending pixel
-      setPendingPixels(prev => prev.filter(p => p.id !== pendingId));
-      return;
+    // Remove the pending pixel — Firestore refetch will show the real one
+    setPendingPixels(prev => prev.filter(p => p.id !== pendingId));
+    if (result) {
+      queryClient.invalidateQueries({ queryKey: ["domains"] });
     }
-    // Update pending pixel to active with real data
-    setPendingPixels(prev =>
-      prev.map(p => p.id === pendingId ? { ...p, ...result } : p)
-    );
-    // Refresh domains from Firestore
-    queryClient.invalidateQueries({ queryKey: ["domains"] });
   }, [queryClient]);
 
   const toggleSort = (field) => {

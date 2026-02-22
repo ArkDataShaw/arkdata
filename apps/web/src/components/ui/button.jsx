@@ -10,13 +10,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-[hsl(var(--primary))] text-[hsl(var(--bg-0))] shadow-md hover:bg-[hsl(var(--primary-light))] active:bg-[hsl(var(--primary-dark))]",
+          "bg-[hsl(var(--primary))] text-white shadow-md hover:bg-[hsl(var(--primary-light))] active:bg-[hsl(var(--primary-dark))]",
         destructive:
-          "bg-[hsl(var(--danger))] text-[hsl(var(--bg-0))] shadow-md hover:bg-[hsl(var(--danger-light))] active:bg-[hsl(var(--danger-dark))]",
+          "bg-[hsl(var(--danger))] text-white shadow-md hover:bg-[hsl(var(--danger-light))] active:bg-[hsl(var(--danger-dark))]",
         outline:
           "border border-[hsl(var(--border-1))] bg-transparent text-[hsl(var(--text-1))] shadow-sm hover:bg-[hsl(var(--hover))] hover:border-[hsl(var(--border-2))]",
         secondary:
-          "bg-[hsl(var(--secondary))] text-[hsl(var(--bg-0))] shadow-md hover:bg-[hsl(var(--secondary-light))] active:bg-[hsl(var(--secondary-dark))]",
+          "bg-[hsl(var(--secondary))] text-white shadow-md hover:bg-[hsl(var(--secondary-light))] active:bg-[hsl(var(--secondary-dark))]",
         ghost: "hover:bg-[hsl(var(--hover))] text-[hsl(var(--text-1))]",
         link: "text-[hsl(var(--primary))] underline-offset-4 hover:underline",
       },
