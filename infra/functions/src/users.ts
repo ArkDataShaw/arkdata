@@ -88,8 +88,11 @@ export const inviteUser = functions.https.onCall(async (data, context) => {
     updated_at: FieldValue.serverTimestamp(),
   });
 
-  // Generate password reset link so the invited user can set their password.
-  const resetLink = await adminAuth.generatePasswordResetLink(email);
+  // Generate password reset link and rewrite to our custom page
+  const firebaseResetLink = await adminAuth.generatePasswordResetLink(email);
+  const parsedUrl = new URL(firebaseResetLink);
+  const oobCode = parsedUrl.searchParams.get("oobCode");
+  const resetLink = `https://app.arkdata.io/reset-password?oobCode=${oobCode}`;
 
   return {
     uid: userRecord.uid,
