@@ -26,29 +26,37 @@ export default function Billing() {
       const tenantSnap = await getDoc(doc(db, "tenants", tenantId));
       const tenant = tenantSnap.exists() ? tenantSnap.data() : null;
 
-      const isTrial = tenant?.plan === "trial" || tenant?.status === "trial";
+      const plan = tenant?.plan || "trial";
+      const isTrial = plan === "trial" || tenant?.status === "trial";
       const trialExpiresAt = tenant?.trial_expires_at ? new Date(tenant.trial_expires_at) : null;
       const createdAt = tenant?.created_at?.toDate ? tenant.created_at.toDate() : tenant?.created_at ? new Date(tenant.created_at) : null;
 
+      // For paid plans, calculate 30-day billing setup deadline from account creation
+      const billingSetupDeadline = !isTrial && createdAt
+        ? new Date(createdAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+        : null;
+
       return {
         tenant_id: tenantId,
+        plan,
         trial_started_at: createdAt,
         trial_ends_at: trialExpiresAt,
+        billing_setup_deadline: billingSetupDeadline,
         billing_status: isTrial ? "trialing" : "active",
-        plan_key: tenant?.plan || "trial",
+        has_payment_method: false, // TODO: check Plaid connection
       };
     },
     enabled: !!tenantId,
   });
 
-  const daysRemaining = billingState?.trial_ends_at
-    ? Math.max(
-        0,
-        Math.ceil(
-          (new Date(billingState.trial_ends_at) - new Date()) /
-            (1000 * 60 * 60 * 24)
-        )
-      )
+  const isTrial = billingState?.billing_status === "trialing";
+
+  const daysRemaining = isTrial && billingState?.trial_ends_at
+    ? Math.max(0, Math.ceil((new Date(billingState.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24)))
+    : null;
+
+  const billingSetupDays = !isTrial && billingState?.billing_setup_deadline && !billingState?.has_payment_method
+    ? Math.max(0, Math.ceil((new Date(billingState.billing_setup_deadline) - new Date()) / (1000 * 60 * 60 * 24)))
     : null;
 
   return (
@@ -64,7 +72,7 @@ export default function Billing() {
         </div>
 
         {/* Trial Banner */}
-        {billingState?.billing_status === "trialing" && daysRemaining !== null && (
+        {isTrial && daysRemaining !== null && (
           <Card className="mt-5 border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
             <CardContent className="p-4 flex items-start justify-between">
               <div className="flex gap-3">
@@ -82,6 +90,30 @@ export default function Billing() {
               </div>
               <Badge variant="secondary" className="flex-shrink-0">
                 {daysRemaining} days left
+              </Badge>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Billing Setup Banner (paid plans without payment method) */}
+        {billingSetupDays !== null && (
+          <Card className="mt-5 border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+            <CardContent className="p-4 flex items-start justify-between">
+              <div className="flex gap-3">
+                <CreditCard className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-amber-900 dark:text-amber-100">
+                    Payment Method Required
+                  </h3>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    {billingSetupDays === 0
+                      ? "Please connect a payment method today to avoid service interruption."
+                      : `Please connect a payment method within ${billingSetupDays} days to continue uninterrupted service.`}
+                  </p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="flex-shrink-0 bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200">
+                {billingSetupDays} days left
               </Badge>
             </CardContent>
           </Card>
