@@ -108,6 +108,22 @@ service cloud.firestore {
         allow delete: if isSuperAdmin() || isTenantAdmin(tenantId);
       }
 
+      // ---- Notifications sub-collection ----
+      // Any authenticated user can create notifications for the arkdata tenant
+      // (used for cross-tenant feedback notifications to admin)
+      match /notifications/{notifId} {
+        allow read: if isSuperAdmin() || canRead(tenantId);
+        allow create: if isAuthenticated() && tenantId == 'arkdata';
+        allow update, delete: if isSuperAdmin() || canWrite(tenantId);
+      }
+
+      // ---- Onboarding state sub-collection ----
+      // Users can read/write their own onboarding state
+      match /onboarding_state/{userId} {
+        allow read, write: if isAuthenticated()
+          && (isSuperAdmin() || (isTenantMember(tenantId) && request.auth.uid == userId));
+      }
+
       // ---- All other tenant subcollections (catch-all for admin) ----
       match /{subcollection}/{docId} {
         allow read: if isSuperAdmin() || canRead(tenantId);
