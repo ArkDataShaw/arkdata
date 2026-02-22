@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertCircle, CreditCard, TrendingUp, FileText } from "lucide-react";
+import ComingSoon from "@/components/guards/ComingSoon";
 import BillingOverview from "@/components/billing/BillingOverview";
 import BillingUsage from "@/components/billing/BillingUsage";
 import BillingCard from "@/components/billing/BillingCard";
@@ -144,7 +145,9 @@ export default function Billing() {
           </TabsContent>
 
           <TabsContent value="usage" className="mt-6">
-            <BillingUsage billingState={billingState} />
+            <ComingSoon>
+              <BillingUsage billingState={billingState} />
+            </ComingSoon>
           </TabsContent>
 
           <TabsContent value="card" className="mt-6">
