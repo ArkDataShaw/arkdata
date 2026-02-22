@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getDb } from "@arkdata/firebase-sdk";
@@ -10,10 +10,13 @@ import { Button } from "@/components/ui/button";
 /**
  * Floating onboarding sprite that guides first-time users through pixel creation.
  *
+ * Only appears when the user's team has zero active pixels and onboarding hasn't
+ * been completed/dismissed yet. If the team already has pixels, it never shows.
+ *
  * Steps:
  *   0 — Welcome (any non-pixel page): "Let's create your first pixel"
  *   1 — On pixel page, no pixels yet: "Click Create First Pixel above"
- *   2 — Pixel created: "You're all set! More features coming soon."
+ *   2 — Pixel just created during this session: "You're all set!"
  *
  * Dismissed permanently after step 2 (or manual dismiss). State persisted in Firestore.
  */
@@ -44,6 +47,8 @@ export default function OnboardingSprite({ currentPageName }) {
   const [minimized, setMinimized] = useState(false);
   const [userId, setUserId] = useState(null);
   const [tenantId, setTenantId] = useState(null);
+  // Track whether user had zero pixels when the sprite first loaded
+  const [hadNoPixelsOnLoad, setHadNoPixelsOnLoad] = useState(null); // null = not yet checked
   const navigate = useNavigate();
 
   // Load user info
@@ -68,27 +73,17 @@ export default function OnboardingSprite({ currentPageName }) {
     }).catch(() => setDismissed(true)); // fail safe — don't block the user
   }, [userId, tenantId]);
 
-  // Query existing pixels
-  const { data: domains = [] } = useQuery({
+  // Query existing pixels (only if onboarding hasn't been dismissed yet)
+  const { data: domains, isLoading: domainsLoading } = useQuery({
     queryKey: ["domains"],
     queryFn: () => base44.entities.Domain.list(),
     enabled: dismissed === false,
   });
 
-  const hasPixels = domains.length > 0;
+  const hasPixels = (domains || []).length > 0;
   const isOnPixelPage = currentPageName === "AppSettings";
 
-  // Determine current step
-  let step;
-  if (hasPixels) {
-    step = 2;
-  } else if (isOnPixelPage) {
-    step = 1;
-  } else {
-    step = 0;
-  }
-
-  const markComplete = async () => {
+  const markComplete = useCallback(async () => {
     setDismissed(true);
     if (!userId || !tenantId) return;
     try {
@@ -98,7 +93,31 @@ export default function OnboardingSprite({ currentPageName }) {
     } catch (err) {
       console.error("Failed to persist onboarding state:", err);
     }
-  };
+  }, [userId, tenantId]);
+
+  // On first domain load: if team already has pixels, silently dismiss forever
+  useEffect(() => {
+    if (dismissed !== false || domainsLoading || hadNoPixelsOnLoad !== null) return;
+
+    if (hasPixels) {
+      // Team already has pixels — never show onboarding
+      markComplete();
+    } else {
+      // No pixels — show the onboarding flow
+      setHadNoPixelsOnLoad(true);
+    }
+  }, [dismissed, domainsLoading, hasPixels, hadNoPixelsOnLoad, markComplete]);
+
+  // Determine current step
+  let step;
+  if (hadNoPixelsOnLoad && hasPixels) {
+    // User just created their first pixel during this session
+    step = 2;
+  } else if (isOnPixelPage) {
+    step = 1;
+  } else {
+    step = 0;
+  }
 
   const handleCta = () => {
     if (step === 0) {
@@ -112,8 +131,9 @@ export default function OnboardingSprite({ currentPageName }) {
     markComplete();
   };
 
-  // Don't render while loading or if already completed
+  // Don't render while loading, if already completed, or if team already had pixels
   if (dismissed === null || dismissed === true) return null;
+  if (hadNoPixelsOnLoad === null) return null; // still checking domains
 
   const currentStep = ONBOARDING_STEPS[step];
   const Icon = currentStep.icon;
