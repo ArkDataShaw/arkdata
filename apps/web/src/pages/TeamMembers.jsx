@@ -29,9 +29,9 @@ import moment from "moment";
 const roleLabels = {
   super_admin: "Super Admin",
   tenant_admin: "Owner",
-  analyst: "Analyst",
-  operator: "Operator",
-  read_only: "Viewer",
+  analyst: "Member",
+  operator: "Member",
+  read_only: "Member",
 };
 
 export default function TeamMembers() {
@@ -229,9 +229,7 @@ export default function TeamMembers() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="tenant_admin">Owner</SelectItem>
-                  <SelectItem value="analyst">Analyst</SelectItem>
-                  <SelectItem value="operator">Operator</SelectItem>
-                  <SelectItem value="read_only">Viewer</SelectItem>
+                  <SelectItem value="read_only">Member</SelectItem>
                 </SelectContent>
               </Select>
             </div>
