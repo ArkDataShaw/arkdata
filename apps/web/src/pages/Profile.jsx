@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { getDb } from "@arkdata/firebase-sdk";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +11,18 @@ import { Badge } from "@/components/ui/badge";
 import { Save, AlertCircle, CheckCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const roleLabels = {
+  super_admin: "Super Admin",
+  tenant_admin: "Owner",
+  analyst: "Member",
+  operator: "Member",
+  read_only: "Member",
+};
+
 export default function Profile() {
+  const { user: authUser } = useAuth();
   const [user, setUser] = useState(null);
+  const [tenantName, setTenantName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -20,15 +33,29 @@ export default function Profile() {
     bio: "",
   });
 
+  const isOwner = authUser?.role === "tenant_admin" || authUser?.role === "super_admin";
+
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchData = async () => {
       try {
         const currentUser = await base44.auth.me();
         setUser(currentUser);
+
+        // Fetch tenant name
+        let company = "";
+        if (currentUser.tenant_id) {
+          const db = getDb();
+          const tenantSnap = await getDoc(doc(db, "tenants", currentUser.tenant_id));
+          if (tenantSnap.exists()) {
+            company = tenantSnap.data().name || "";
+            setTenantName(company);
+          }
+        }
+
         setFormData({
-          full_name: currentUser.full_name || "",
+          full_name: currentUser.name || "",
           phone: currentUser.phone || "",
-          company: currentUser.company || "",
+          company,
           bio: currentUser.bio || "",
         });
       } catch (error) {
@@ -39,7 +66,7 @@ export default function Profile() {
       }
     };
 
-    fetchUser();
+    fetchData();
   }, []);
 
   const handleChange = (e) => {
@@ -51,12 +78,20 @@ export default function Profile() {
     setSaving(true);
     setMessage(null);
     try {
-      await base44.auth.updateMe(formData);
+      // Update user profile
+      await base44.auth.updateMe({ name: formData.full_name });
+
+      // If owner and company name changed, update tenant doc
+      if (isOwner && formData.company && formData.company !== tenantName && authUser?.tenant_id) {
+        const db = getDb();
+        await updateDoc(doc(db, "tenants", authUser.tenant_id), {
+          name: formData.company,
+        });
+        setTenantName(formData.company);
+      }
+
       setMessage({ type: "success", text: "Profile saved successfully!" });
-      
-      // Update local user state
-      setUser(prev => ({ ...prev, ...formData }));
-      
+      setUser(prev => ({ ...prev, name: formData.full_name }));
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
       console.error("Failed to save profile:", error);
@@ -94,8 +129,8 @@ export default function Profile() {
       {/* Messages */}
       {message && (
         <div className={`flex gap-3 p-4 rounded-lg ${
-          message.type === "success" 
-            ? "bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-900" 
+          message.type === "success"
+            ? "bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-900"
             : "bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900"
         }`}>
           {message.type === "success" ? (
@@ -118,14 +153,14 @@ export default function Profile() {
           <div className="flex items-center gap-4 pb-4 border-b border-border">
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
               <span className="text-xl font-semibold text-white">
-                {user?.full_name?.charAt(0) || "U"}
+                {(user?.name || user?.email)?.[0]?.toUpperCase() || "U"}
               </span>
             </div>
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
               <p className="font-medium">{user?.email}</p>
-              <Badge className="mt-2" variant={user?.role === "admin" ? "default" : "secondary"}>
-                {user?.role === "admin" ? "Admin" : "User"}
+              <Badge className="mt-2" variant="secondary">
+                {roleLabels[authUser?.role] || authUser?.role || "Member"}
               </Badge>
             </div>
           </div>
@@ -152,12 +187,21 @@ export default function Profile() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold mb-2">Company</label>
+            <label className="block text-sm font-semibold mb-2">
+              Company
+              {!isOwner && (
+                <span className="text-xs font-normal text-slate-400 ml-2">
+                  (Only owners can change this)
+                </span>
+              )}
+            </label>
             <Input
               name="company"
               value={formData.company}
               onChange={handleChange}
               placeholder="Your company name"
+              disabled={!isOwner}
+              className={!isOwner ? "bg-slate-50 dark:bg-slate-900" : ""}
             />
           </div>
 
@@ -195,11 +239,7 @@ export default function Profile() {
           </div>
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Member Since</p>
-            <p>{new Date(user?.created_date).toLocaleDateString()}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Last Updated</p>
-            <p>{new Date(user?.updated_date).toLocaleDateString()}</p>
+            <p>{user?.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}</p>
           </div>
         </CardContent>
       </Card>
