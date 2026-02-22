@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useMutation } from "@tanstack/react-query";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { getDb } from "@arkdata/firebase-sdk";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+
+const FEEDBACK_TYPE_LABELS = {
+  general_feedback: "General Feedback",
+  feature_request: "Feature Request",
+  bug: "Bug Report",
+};
 
 export default function FeedbackSubmissionForm({ open, onOpenChange }) {
   const [formData, setFormData] = useState({
@@ -31,7 +39,28 @@ export default function FeedbackSubmissionForm({ open, onOpenChange }) {
         page_url: window.location.href,
         status: "new",
       };
-      return base44.entities.Feedback.create(feedback);
+      const result = await base44.entities.Feedback.create(feedback);
+
+      // Create a notification for shaw@arkdata.io on the arkdata tenant
+      // (cross-tenant write — bypasses base44 SDK which is scoped to current tenant)
+      try {
+        const db = getDb();
+        const notificationsRef = collection(db, "tenants", "arkdata", "notifications");
+        await addDoc(notificationsRef, {
+          user_email: "shaw@arkdata.io",
+          title: `New Feedback: ${data.title}`,
+          body: `${user.email} submitted ${FEEDBACK_TYPE_LABELS[data.type] || data.type}`,
+          type: "feedback_submitted",
+          link: "/AdminFeedback",
+          read: false,
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp(),
+        });
+      } catch (err) {
+        console.error("Failed to create feedback notification:", err);
+      }
+
+      return result;
     },
     onSuccess: () => {
       setSubmitted(true);

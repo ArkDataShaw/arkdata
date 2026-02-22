@@ -577,102 +577,125 @@ export default function AppSettings() {
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="flex justify-end">
-        <div className="relative w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
-            placeholder="Search by name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      {allPixels.length === 0 ? (
+        /* Empty state — no pixels exist yet */
+        <div className="flex flex-col items-center justify-center py-32 px-6">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-6">
+            <CodeXml className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+          </div>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
+            Create Your First Pixel
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-sm mb-6">
+            Add a tracking pixel to your website to start identifying visitors and capturing intent data.
+          </p>
+          <Button
+            onClick={() => setCreateOpen(true)}
+            className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 gap-1.5 px-6 py-2.5 text-base"
+          >
+            Create First Pixel
+          </Button>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Search */}
+          <div className="flex justify-end">
+            <div className="relative w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Search by name..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
 
-      {/* Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-        <table className="w-full">
-          <thead className="border-b border-slate-100 dark:border-slate-800">
-            <tr>
-              <SortHeader field="name">Website Name</SortHeader>
-              <SortHeader field="domain">Website Url</SortHeader>
-              <SortHeader field="last_event_at">Last Sync</SortHeader>
-              <th className="text-left px-4 py-3 text-sm font-medium text-slate-500 dark:text-slate-400">Status</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-sm text-slate-400 dark:text-slate-500">
-                  {search ? "No pixels match your search" : "No pixels created yet"}
-                </td>
-              </tr>
-            ) : (
-              filtered.map(d => {
-                const isCreating = d.status === "creating";
-                return (
-                  <tr key={d.id} className={`transition-colors ${isCreating ? "opacity-60" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}>
-                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">
-                      {d.name || d.domain || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                      {d.domain ? `https://${d.domain.replace(/^https?:\/\//, "")}` : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
-                      {d.last_event_at ? moment(d.last_event_at).fromNow() : "Never"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={d.status || "active"} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        {!isCreating && (
-                          <>
-                            <button
-                              title="Install pixel"
-                              onClick={() => setInstallPixel(d)}
-                              className="p-1.5 rounded-md text-violet-500 hover:text-violet-700 hover:bg-violet-50 dark:hover:text-violet-400 dark:hover:bg-violet-900/20 transition-colors"
-                            >
-                              <CodeXml className="w-4 h-4" />
-                            </button>
-                            {[
-                              { icon: BarChart3, title: "Analytics" },
-                              { icon: Users, title: "Visitors" },
-                              { icon: Copy, title: "Copy pixel" },
-                              { icon: Download, title: "Export" },
-                              { icon: Settings, title: "Settings" },
-                            ].map(({ icon: Icon, title }) => (
-                              <button
-                                key={title}
-                                title={title}
-                                className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-800 transition-colors"
-                              >
-                                <Icon className="w-4 h-4" />
-                              </button>
-                            ))}
-                            <button
-                              title="Delete"
-                              onClick={() => setDeletePixel(d)}
-                              className="p-1.5 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                        {isCreating && (
-                          <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
-                        )}
-                      </div>
+          {/* Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <table className="w-full">
+              <thead className="border-b border-slate-100 dark:border-slate-800">
+                <tr>
+                  <SortHeader field="name">Website Name</SortHeader>
+                  <SortHeader field="domain">Website Url</SortHeader>
+                  <SortHeader field="last_event_at">Last Sync</SortHeader>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-500 dark:text-slate-400">Status</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-slate-400 dark:text-slate-500">
+                      No pixels match your search
                     </td>
                   </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                ) : (
+                  filtered.map(d => {
+                    const isCreating = d.status === "creating";
+                    return (
+                      <tr key={d.id} className={`transition-colors ${isCreating ? "opacity-60" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}>
+                        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">
+                          {d.name || d.domain || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                          {d.domain ? `https://${d.domain.replace(/^https?:\/\//, "")}` : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+                          {d.last_event_at ? moment(d.last_event_at).fromNow() : "Never"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={d.status || "active"} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            {!isCreating && (
+                              <>
+                                <button
+                                  title="Install pixel"
+                                  onClick={() => setInstallPixel(d)}
+                                  className="p-1.5 rounded-md text-violet-500 hover:text-violet-700 hover:bg-violet-50 dark:hover:text-violet-400 dark:hover:bg-violet-900/20 transition-colors"
+                                >
+                                  <CodeXml className="w-4 h-4" />
+                                </button>
+                                {[
+                                  { icon: BarChart3, title: "Analytics" },
+                                  { icon: Users, title: "Visitors" },
+                                  { icon: Copy, title: "Copy pixel" },
+                                  { icon: Download, title: "Export" },
+                                  { icon: Settings, title: "Settings" },
+                                ].map(({ icon: Icon, title }) => (
+                                  <button
+                                    key={title}
+                                    title={title}
+                                    className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+                                  >
+                                    <Icon className="w-4 h-4" />
+                                  </button>
+                                ))}
+                                <button
+                                  title="Delete"
+                                  onClick={() => setDeletePixel(d)}
+                                  className="p-1.5 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20 transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                            {isCreating && (
+                              <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       <CreatePixelModal
         open={createOpen}

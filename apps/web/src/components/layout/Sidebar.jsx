@@ -1,13 +1,20 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/lib/AuthContext";
+import { base44 } from "@/api/base44Client";
 import {
   Home, Users, Building2, Activity, AlertTriangle, BarChart3,
-  Plug, GitBranch, FileText, Settings, ChevronLeft, ChevronRight,
-  Shield, Layers, Target, CreditCard, CodeXml, Key
+  Plug, GitBranch, FileText, Settings,
+  Shield, Layers, Target, CreditCard, CodeXml, Key,
+  Moon, Sun, LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import NotificationManager from "@/components/notifications/NotificationManager";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 const mainNav = [
   {
@@ -51,8 +58,7 @@ const adminSection = {
   ],
 };
 
-export default function Sidebar({ currentPage }) {
-  const [collapsed, setCollapsed] = useState(false);
+export default function Sidebar({ currentPage, collapsed, onToggleCollapse, darkMode, onToggleDarkMode }) {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "super_admin";
   const isTeamAdmin = user?.role === "tenant_admin" || isSuperAdmin;
@@ -80,13 +86,22 @@ export default function Sidebar({ currentPage }) {
         collapsed ? "w-[68px]" : "w-[240px]"
       )}
     >
-      {/* Logo */}
-      <div className="h-16 flex items-center px-4 border-b border-slate-200 dark:border-slate-800/50">
-        <div className="flex items-center gap-2.5 min-w-0">
+      {/* Logo + Notification Bell */}
+      <div className={cn(
+        "h-16 flex items-center border-b border-slate-200 dark:border-slate-800/50",
+        collapsed ? "justify-center px-2" : "justify-between px-4"
+      )}>
+        <div className={cn(
+          "flex items-center min-w-0",
+          collapsed ? "justify-center" : "gap-2.5"
+        )}>
           <img
             src="/logo.png"
             alt="Ark Data"
-            className="w-11 h-11 -m-1.5 object-contain flex-shrink-0"
+            className={cn(
+              "object-contain flex-shrink-0",
+              collapsed ? "w-10 h-10" : "w-11 h-11 -m-1.5"
+            )}
           />
           {!collapsed && (
             <span className="font-semibold text-base tracking-tight whitespace-nowrap">
@@ -94,6 +109,7 @@ export default function Sidebar({ currentPage }) {
             </span>
           )}
         </div>
+        {!collapsed && <NotificationManager currentUser={user} />}
       </div>
 
       {/* Navigation */}
@@ -113,7 +129,8 @@ export default function Sidebar({ currentPage }) {
                     key={item.page}
                     to={createPageUrl(item.page)}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150",
+                      "flex items-center rounded-lg text-sm font-medium transition-all duration-150",
+                      collapsed ? "justify-center px-0 py-2" : "gap-3 px-3 py-2",
                       isActive
                         ? "bg-violet-100 text-violet-700 dark:bg-violet-600/20 dark:text-violet-300"
                         : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/60"
@@ -129,29 +146,41 @@ export default function Sidebar({ currentPage }) {
         ))}
       </nav>
 
-      {/* User info + collapse toggle */}
+      {/* User drop-up menu */}
       <div className="border-t border-slate-200 dark:border-slate-800/50">
-        {!collapsed && user && (
-          <div className="px-4 py-3 flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-semibold text-violet-600">
-                {(user.name || user.email)?.[0]?.toUpperCase() || "?"}
-              </span>
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-200 truncate">
-                {user.name || "User"}
-              </p>
-              <p className="text-xs text-slate-400 truncate">{user.email}</p>
-            </div>
-          </div>
-        )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full h-10 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors"
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={cn(
+              "w-full flex items-center hover:bg-slate-200/70 dark:hover:bg-slate-800/60 transition-colors",
+              collapsed ? "py-3 justify-center" : "gap-2.5 px-4 py-3"
+            )}>
+              <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-semibold text-violet-600">
+                  {(user?.name || user?.email)?.[0]?.toUpperCase() || "?"}
+                </span>
+              </div>
+              {!collapsed && user && (
+                <div className="min-w-0 text-left">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-200 truncate">
+                    {user.name || "User"}
+                  </p>
+                  <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                </div>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" className="w-48">
+            <DropdownMenuItem onClick={onToggleDarkMode} className="cursor-pointer">
+              {darkMode ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
+              {darkMode ? "Light Mode" : "Dark Mode"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => base44.auth.logout()} className="text-red-600 cursor-pointer">
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </aside>
   );
