@@ -34,7 +34,7 @@ export default function Login() {
       await checkAppState();
       navigate("/");
     } catch (err) {
-      setError(err.message || "Invalid email or password");
+      setError("Invalid email or password");
     } finally {
       setLoading(false);
     }
