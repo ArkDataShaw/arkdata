@@ -5,6 +5,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   updateProfile,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { getAuthInstance, getDb } from './config';
@@ -194,5 +195,11 @@ export const auth = {
         callback(null);
       }
     });
+  },
+
+  /** Send a password reset email */
+  async sendPasswordResetEmail(email: string): Promise<void> {
+    const firebaseAuth = getAuthInstance();
+    await firebaseSendPasswordResetEmail(firebaseAuth, email);
   },
 };
