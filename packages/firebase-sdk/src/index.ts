@@ -25,6 +25,7 @@ export {
   deleteTenantUser,
   updateTenantLimitsFn,
   impersonateUserFn,
+  requestPasswordResetFn,
 } from './functions';
 import { createEntityProxy } from './entities';
 import { auth } from './auth';

@@ -2,6 +2,7 @@ import * as functions from "firebase-functions";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import * as crypto from "crypto";
+import * as nodemailer from "nodemailer";
 
 const VALID_ROLES = ["super_admin", "tenant_admin", "analyst", "operator", "read_only"];
 
@@ -181,6 +182,87 @@ export const deleteUser = functions.https.onCall(async (data, context) => {
 
   // Delete Firebase Auth user
   await adminAuth.deleteUser(uid);
+
+  return { success: true };
+});
+
+/** Request a password reset — generates link and sends branded email */
+export const requestPasswordReset = functions.https.onCall(async (data) => {
+  const { email } = data;
+
+  if (!email || typeof email !== "string") {
+    throw new functions.https.HttpsError("invalid-argument", "Email is required");
+  }
+
+  const adminAuth = getAuth();
+
+  // Verify user exists — if not, return success silently (don't reveal account existence)
+  try {
+    await adminAuth.getUserByEmail(email);
+  } catch {
+    return { success: true };
+  }
+
+  // Generate reset link pointing to our custom page
+  const firebaseResetLink = await adminAuth.generatePasswordResetLink(email);
+  const parsedUrl = new URL(firebaseResetLink);
+  const oobCode = parsedUrl.searchParams.get("oobCode");
+  const resetLink = `https://app.arkdata.io/reset-password?oobCode=${oobCode}`;
+
+  // Send branded email via Gmail SMTP
+  const smtpUser = functions.config().smtp?.user || "";
+  const smtpPass = functions.config().smtp?.pass || "";
+
+  if (!smtpUser || !smtpPass) {
+    functions.logger.error("SMTP credentials not configured. Set smtp.user and smtp.pass via firebase functions:config:set");
+    throw new functions.https.HttpsError("internal", "Email service not configured");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  });
+
+  await transporter.sendMail({
+    from: '"Ark Data" <support@arkdata.io>',
+    to: email,
+    subject: "Reset your Ark Data password",
+    html: `
+      <div style="max-width: 480px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b;">
+        <div style="padding: 32px 24px; text-align: center;">
+          <h1 style="font-size: 24px; font-weight: 700; margin: 0 0 8px;">Ark Data</h1>
+          <p style="color: #64748b; font-size: 14px; margin: 0;">Password Reset</p>
+        </div>
+        <div style="background: #f8fafc; border-radius: 12px; padding: 32px 24px; margin: 0 24px;">
+          <p style="font-size: 15px; line-height: 1.6; margin: 0 0 16px;">
+            We received a request to reset the password for your account (<strong>${email}</strong>).
+          </p>
+          <p style="font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
+            Click the button below to set a new password. This link expires in 1 hour.
+          </p>
+          <div style="text-align: center;">
+            <a href="${resetLink}"
+               style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 15px; font-weight: 600;">
+              Reset Password
+            </a>
+          </div>
+          <p style="font-size: 13px; color: #94a3b8; margin: 24px 0 0; line-height: 1.5;">
+            If you didn't request this, you can safely ignore this email. Your password won't change.
+          </p>
+        </div>
+        <div style="padding: 24px; text-align: center;">
+          <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+            Ark Data &middot; <a href="https://app.arkdata.io" style="color: #64748b;">app.arkdata.io</a>
+          </p>
+        </div>
+      </div>
+    `,
+  });
 
   return { success: true };
 });

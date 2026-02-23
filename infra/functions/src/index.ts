@@ -6,7 +6,7 @@ initializeApp();
 export { createTenant, updateTenantLimits } from "./tenants";
 
 // User management
-export { inviteUser, updateUserRole, deleteUser } from "./users";
+export { inviteUser, updateUserRole, deleteUser, requestPasswordReset } from "./users";
 
 // Impersonation
 export { impersonateUser } from "./impersonate";

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { base44, requestPasswordResetFn } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ export default function Login() {
     setError("");
 
     try {
-      await base44.auth.sendPasswordResetEmail(email.trim());
+      await requestPasswordResetFn(email.trim());
       setResetSent(true);
     } catch (err) {
       // Don't reveal whether email exists — always show success

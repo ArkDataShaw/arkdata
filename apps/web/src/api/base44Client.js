@@ -11,3 +11,4 @@ import { base44, initializeFirebase } from '@arkdata/firebase-sdk';
 initializeFirebase();
 
 export { base44 };
+export { requestPasswordResetFn } from '@arkdata/firebase-sdk';

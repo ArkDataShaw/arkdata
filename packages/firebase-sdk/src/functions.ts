@@ -76,6 +76,15 @@ export async function updateTenantLimitsFn(
   return result.data;
 }
 
+/** Request a password reset — sends branded email from support@arkdata.io */
+export async function requestPasswordResetFn(
+  email: string
+): Promise<{ success: boolean }> {
+  const fn = getCallable<{ email: string }, { success: boolean }>('requestPasswordReset');
+  const result = await fn({ email });
+  return result.data;
+}
+
 /** Impersonate a user — signs in with the returned custom token */
 export async function impersonateUserFn(uid: string): Promise<{
   target_user: {
