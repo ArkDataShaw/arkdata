@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import {
-  Search, HelpCircle, ChevronRight, PanelLeft
+  Search, HelpCircle, ChevronRight, PanelLeft, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +32,7 @@ const PAGE_LABELS = {
   AdminSecurity: "Security",
 };
 
-export default function TopBar({ onHelpClick, collapsed, onToggleCollapse, currentPageName, children }) {
+export default function TopBar({ onHelpClick, collapsed, onToggleCollapse, currentPageName, children, isImpersonating, bannerDismissed, onRestoreBanner }) {
   const pageLabel = PAGE_LABELS[currentPageName] || currentPageName;
 
   return (
@@ -85,10 +85,20 @@ export default function TopBar({ onHelpClick, collapsed, onToggleCollapse, curre
       </TooltipProvider>
 
       <div className="flex items-center gap-2">
-        {/* Help */}
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 dark:text-slate-400" onClick={onHelpClick}>
-          <HelpCircle className="w-4 h-4" />
-        </Button>
+        {bannerDismissed ? (
+          <Button
+            size="sm"
+            className="bg-amber-500 hover:bg-amber-600 text-slate-900 h-8 text-xs font-semibold"
+            onClick={onRestoreBanner}
+          >
+            <Eye className="w-3.5 h-3.5 mr-1.5" />
+            Viewing as...
+          </Button>
+        ) : (
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 dark:text-slate-400" onClick={onHelpClick}>
+            <HelpCircle className="w-4 h-4" />
+          </Button>
+        )}
       </div>
     </header>
   );

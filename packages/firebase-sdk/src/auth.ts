@@ -22,6 +22,36 @@ export interface ArkDataUser {
   created_at?: string;
   phone?: string;
   bio?: string;
+  /** Set when a super_admin is impersonating this user */
+  impersonated_by?: string;
+}
+
+const IMPERSONATION_KEY = 'arkdata_impersonation_origin';
+
+export interface ImpersonationOrigin {
+  admin_uid: string;
+  admin_email: string;
+  admin_name: string;
+}
+
+/** Save the original admin info before impersonating */
+export function saveImpersonationOrigin(origin: ImpersonationOrigin): void {
+  localStorage.setItem(IMPERSONATION_KEY, JSON.stringify(origin));
+}
+
+/** Get the saved impersonation origin (null if not impersonating) */
+export function getImpersonationOrigin(): ImpersonationOrigin | null {
+  try {
+    const raw = localStorage.getItem(IMPERSONATION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Clear impersonation origin */
+export function clearImpersonationOrigin(): void {
+  localStorage.removeItem(IMPERSONATION_KEY);
 }
 
 /** Wait for Firebase Auth to resolve its initial state (cached after first resolution) */
@@ -116,6 +146,12 @@ export const auth = {
     const tokenResult = await user.getIdTokenResult(true);
     cachedTokenClaims = tokenResult.claims as Record<string, unknown>;
     cachedUser = firebaseUserToArkData(user, cachedTokenClaims);
+    // Mark as impersonated if the claim is present or localStorage has origin
+    if (cachedTokenClaims.impersonated_by) {
+      cachedUser.impersonated_by = cachedTokenClaims.impersonated_by as string;
+    } else if (getImpersonationOrigin()) {
+      cachedUser.impersonated_by = getImpersonationOrigin()!.admin_uid;
+    }
     // Also populate tenant cache while we have the claims
     if (cachedTokenClaims.tenant_id) {
       cachedTenantId = cachedTokenClaims.tenant_id as string;
@@ -144,6 +180,7 @@ export const auth = {
     cachedUser = null;
     cachedTenantId = null;
     cachedTokenClaims = null;
+    clearImpersonationOrigin();
     const firebaseAuth = getAuthInstance();
     const cred = await signInWithEmailAndPassword(firebaseAuth, email, password);
     // Force refresh to ensure custom claims (tenant_id, role) are present —
@@ -160,6 +197,7 @@ export const auth = {
     cachedUser = null;
     cachedTenantId = null;
     cachedTokenClaims = null;
+    clearImpersonationOrigin();
     const firebaseAuth = getAuthInstance();
     const provider = new GoogleAuthProvider();
     const cred = await signInWithPopup(firebaseAuth, provider);
@@ -173,6 +211,7 @@ export const auth = {
   /** Sign out — equivalent to base44.auth.logout(redirectUrl?) */
   logout(redirectUrl?: string): void {
     cachedTenantId = null;
+    clearImpersonationOrigin();
     const firebaseAuth = getAuthInstance();
     firebaseSignOut(firebaseAuth).then(() => {
       if (redirectUrl) {

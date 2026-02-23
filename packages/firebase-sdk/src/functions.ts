@@ -5,7 +5,7 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { signInWithCustomToken } from 'firebase/auth';
 import { getApp, getAuthInstance } from './config';
-import { clearTenantIdCache } from './auth';
+import { clearTenantIdCache, saveImpersonationOrigin, clearImpersonationOrigin, getImpersonationOrigin } from './auth';
 
 function getCallable<TData, TResult>(name: string) {
   const functions = getFunctions(getApp());
@@ -85,7 +85,7 @@ export async function requestPasswordResetFn(
   return result.data;
 }
 
-/** Impersonate a user — signs in with the returned custom token */
+/** Impersonate a user — saves admin origin, signs in with the returned custom token */
 export async function impersonateUserFn(uid: string): Promise<{
   target_user: {
     uid: string;
@@ -95,6 +95,17 @@ export async function impersonateUserFn(uid: string): Promise<{
     role: string;
   };
 }> {
+  // Save the current admin's info before switching
+  const auth = getAuthInstance();
+  const currentUser = auth.currentUser;
+  if (currentUser) {
+    saveImpersonationOrigin({
+      admin_uid: currentUser.uid,
+      admin_email: currentUser.email ?? '',
+      admin_name: currentUser.displayName ?? currentUser.email ?? '',
+    });
+  }
+
   const fn = getCallable<
     { uid: string },
     {
@@ -111,9 +122,26 @@ export async function impersonateUserFn(uid: string): Promise<{
   const result = await fn({ uid });
 
   // Sign in with the custom token to switch identity
-  const auth = getAuthInstance();
   clearTenantIdCache();
   await signInWithCustomToken(auth, result.data.custom_token);
 
   return { target_user: result.data.target_user };
+}
+
+/** End impersonation — sign back in as the original super_admin */
+export async function endImpersonationFn(): Promise<void> {
+  const origin = getImpersonationOrigin();
+  if (!origin) throw new Error('Not currently impersonating');
+
+  const fn = getCallable<
+    { original_uid: string },
+    { custom_token: string; admin_user: { uid: string; email: string; display_name: string } }
+  >('endImpersonation');
+  const result = await fn({ original_uid: origin.admin_uid });
+
+  // Sign back in as the admin
+  const auth = getAuthInstance();
+  clearTenantIdCache();
+  clearImpersonationOrigin();
+  await signInWithCustomToken(auth, result.data.custom_token);
 }

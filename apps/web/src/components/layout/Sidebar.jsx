@@ -80,7 +80,7 @@ export default function Sidebar({ currentPage, collapsed, onToggleCollapse, dark
   return (
     <aside
       className={cn(
-        "h-screen flex-col transition-all duration-300 border-r hidden lg:flex",
+        "h-full flex-col transition-all duration-300 border-r hidden lg:flex",
         "bg-slate-100 text-slate-900 border-slate-200",
         "dark:bg-slate-950 dark:text-white dark:border-slate-800/50",
         collapsed ? "w-[68px]" : "w-[240px]"

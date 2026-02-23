@@ -24,7 +24,7 @@ export const impersonateUser = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("not-found", "User not found");
   }
 
-  // Create a custom token with the target user's claims
+  // Create a custom token with the target user's claims + impersonation marker
   const customToken = await adminAuth.createCustomToken(uid, {
     ...(targetUser.customClaims || {}),
     impersonated_by: context.auth.uid,
@@ -38,6 +38,39 @@ export const impersonateUser = functions.https.onCall(async (data, context) => {
       display_name: targetUser.displayName,
       tenant_id: targetUser.customClaims?.tenant_id,
       role: targetUser.customClaims?.role,
+    },
+  };
+});
+
+/** End impersonation — return to the original super_admin account */
+export const endImpersonation = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
+
+  const { original_uid } = data;
+  if (!original_uid) throw new functions.https.HttpsError("invalid-argument", "original_uid required");
+
+  const adminAuth = getAuth();
+
+  // Verify the original user is actually a super_admin
+  const originalUser = await adminAuth.getUser(original_uid);
+  if (!originalUser) {
+    throw new functions.https.HttpsError("not-found", "Original admin user not found");
+  }
+  if (originalUser.customClaims?.role !== "super_admin") {
+    throw new functions.https.HttpsError("permission-denied", "Original user is not a super_admin");
+  }
+
+  // Create a custom token to sign back in as the admin
+  const customToken = await adminAuth.createCustomToken(original_uid, {
+    ...(originalUser.customClaims || {}),
+  });
+
+  return {
+    custom_token: customToken,
+    admin_user: {
+      uid: originalUser.uid,
+      email: originalUser.email,
+      display_name: originalUser.displayName,
     },
   };
 });

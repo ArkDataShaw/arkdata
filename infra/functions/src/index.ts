@@ -9,4 +9,4 @@ export { createTenant, updateTenantLimits } from "./tenants";
 export { inviteUser, updateUserRole, deleteUser, requestPasswordReset } from "./users";
 
 // Impersonation
-export { impersonateUser } from "./impersonate";
+export { impersonateUser, endImpersonation } from "./impersonate";
