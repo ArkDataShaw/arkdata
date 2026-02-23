@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { listAllTenants, createTenantFn, getDb } from "@arkdata/firebase-sdk";
 import { collection, getDocs } from "firebase/firestore";
@@ -30,6 +30,7 @@ const planColors = {
 export default function AdminTenants() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [newTenant, setNewTenant] = useState({ name: "", plan: "trial", trialDays: 14 });
@@ -67,11 +68,15 @@ export default function AdminTenants() {
       undefined,
       newTenant.plan === "trial" ? newTenant.trialDays : undefined
     ),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["admin-tenants"] });
       setCreateOpen(false);
+      const createdName = newTenant.name;
       setNewTenant({ name: "", plan: "trial", trialDays: 14 });
-      toast({ title: "Tenant created", description: `${newTenant.name} has been created.` });
+      toast({ title: "Tenant created", description: `${createdName} has been created.` });
+      if (data?.tenant_id) {
+        navigate(createPageUrl("AdminTenantDetail") + `?id=${data.tenant_id}`);
+      }
     },
     onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
