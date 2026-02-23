@@ -50,7 +50,6 @@ export default function AdminTenantDetail() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: "", role: "read_only" });
-  const [resetLink, setResetLink] = useState(null);
   const [deleteUserId, setDeleteUserId] = useState(null);
 
   const { data: tenant, isLoading: tenantLoading } = useQuery({
@@ -67,17 +66,12 @@ export default function AdminTenantDetail() {
 
   const inviteMutation = useMutation({
     mutationFn: () => inviteUserFn(inviteForm.email, tenantId, inviteForm.role),
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-tenant-users", tenantId] });
       queryClient.invalidateQueries({ queryKey: ["admin-tenant", tenantId] });
+      toast({ title: "Invite sent", description: `Invite sent to ${inviteForm.email}` });
       setInviteOpen(false);
       setInviteForm({ email: "", role: "read_only" });
-      // Show the password reset link so admin can share it with the user
-      if (data.reset_link) {
-        setResetLink(data.reset_link);
-      } else {
-        toast({ title: "User invited", description: "User account created." });
-      }
     },
     onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -358,37 +352,6 @@ export default function AdminTenantDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Reset Link Dialog — shown after successful invite */}
-      <Dialog open={!!resetLink} onOpenChange={(open) => !open && setResetLink(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>User Invited</DialogTitle>
-            <DialogDescription>
-              Share this password reset link with the user so they can set their
-              password and log in. This link expires in 1 hour.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <div className="bg-slate-50 dark:bg-slate-900 border rounded-lg p-3 break-all text-sm font-mono text-slate-700 dark:text-slate-300 select-all">
-              {resetLink}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                navigator.clipboard.writeText(resetLink);
-                toast({ title: "Copied to clipboard" });
-              }}
-            >
-              Copy Link
-            </Button>
-            <Button onClick={() => setResetLink(null)}>
-              Done
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

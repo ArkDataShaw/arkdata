@@ -95,10 +95,74 @@ export const inviteUser = functions.https.onCall(async (data, context) => {
   const oobCode = parsedUrl.searchParams.get("oobCode");
   const resetLink = `https://app.arkdata.io/reset-password?oobCode=${oobCode}`;
 
+  // Fetch caller's display name and tenant name for the invite email
+  const callerRecord = await adminAuth.getUser(context.auth.uid);
+  const inviterName = callerRecord.displayName || callerRecord.email || "A team admin";
+  const tenantName = tenantSnap.data()?.name || "your team";
+
+  // Send branded invite email via Gmail SMTP
+  const smtpUser = functions.config().smtp?.user || "";
+  const smtpPass = functions.config().smtp?.pass || "";
+
+  if (!smtpUser || !smtpPass) {
+    functions.logger.error("SMTP credentials not configured. Set smtp.user and smtp.pass via firebase functions:config:set");
+    throw new functions.https.HttpsError("internal", "Email service not configured");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  });
+
+  await transporter.sendMail({
+    from: '"Ark Data Support" <support@arkdata.io>',
+    to: email,
+    subject: `You've been invited to join ${tenantName} on Ark Data`,
+    html: `
+      <div style="max-width: 480px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b;">
+        <div style="padding: 32px 24px; text-align: center;">
+          <h1 style="font-size: 24px; font-weight: 700; margin: 0 0 8px;">Ark Data</h1>
+          <p style="color: #64748b; font-size: 14px; margin: 0;">Team Invitation</p>
+        </div>
+        <div style="background: #f8fafc; border-radius: 12px; padding: 32px 24px; margin: 0 24px;">
+          <p style="font-size: 15px; line-height: 1.6; margin: 0 0 16px;">
+            Hello ${email},
+          </p>
+          <p style="font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
+            ${inviterName} has invited you to the <strong>${tenantName}</strong> team on <strong>Ark Data</strong>.
+            Click the button below to set your password and join the team.
+          </p>
+          <div style="text-align: center;">
+            <a href="${resetLink}"
+               style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 15px; font-weight: 600;">
+              Join ${tenantName}
+            </a>
+          </div>
+          <p style="font-size: 13px; color: #94a3b8; margin: 24px 0 0; line-height: 1.5;">
+            Or copy and paste this URL into your browser:<br/>
+            <a href="${resetLink}" style="color: #64748b; word-break: break-all;">${resetLink}</a>
+          </p>
+        </div>
+        <div style="padding: 24px; text-align: center;">
+          <p style="font-size: 12px; color: #94a3b8; margin: 0 0 4px;">
+            This invitation is intended for ${email}.
+          </p>
+          <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+            Ark Data &middot; <a href="https://app.arkdata.io" style="color: #64748b;">app.arkdata.io</a>
+          </p>
+        </div>
+      </div>
+    `,
+  });
+
   return {
     uid: userRecord.uid,
     email: userRecord.email,
-    reset_link: resetLink,
   };
 });
 

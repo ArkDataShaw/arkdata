@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { confirmPasswordReset, getAuth } from "firebase/auth";
 import { getAuthInstance } from "@arkdata/firebase-sdk";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const oobCode = searchParams.get("oobCode");
 
   const [password, setPassword] = useState("");
@@ -52,7 +51,7 @@ export default function ResetPassword() {
             <p className="text-sm text-slate-500 mt-2">
               This password reset link is missing required parameters.
             </p>
-            <Button className="mt-4" onClick={() => navigate("/login")}>
+            <Button className="mt-4" onClick={() => { window.location.href = "/login"; }}>
               Go to Login
             </Button>
           </CardContent>
@@ -71,7 +70,7 @@ export default function ResetPassword() {
             <p className="text-sm text-slate-500 mt-2">
               Your password has been set. You can now log in to your account.
             </p>
-            <Button className="mt-4" onClick={() => navigate("/login")}>
+            <Button className="mt-4" onClick={() => { window.location.href = "/login"; }}>
               Go to Login
             </Button>
           </CardContent>
