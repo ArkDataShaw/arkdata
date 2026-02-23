@@ -23,7 +23,7 @@ export interface PaginatedResponse<T> {
 }
 
 /** RBAC roles */
-export type UserRole = 'super_admin' | 'tenant_admin' | 'analyst' | 'operator' | 'read_only';
+export type UserRole = 'super_admin' | 'tenant_admin' | 'read_only';
 
 /** Identity resolution confidence */
 export type MatchType = 'hem' | 'email' | 'phone' | 'name_company' | 'ip_ua';

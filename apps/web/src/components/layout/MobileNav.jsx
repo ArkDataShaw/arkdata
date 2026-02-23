@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Menu, Home, Users, Building2, Activity, AlertTriangle, BarChart3,
   Plug, GitBranch, FileText, Settings, Layers, Target, X, Shield, CodeXml,
-  CreditCard, Key
+  CreditCard, Key, User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,8 @@ const customerNav = [
   { label: "Automations", icon: GitBranch, page: "Automations" },
   { label: "Reports", icon: FileText, page: "Reports" },
   { label: "Billing", icon: CreditCard, page: "Billing" },
-  { label: "Settings", icon: Settings, page: "Profile" },
+  { label: "Settings", icon: Settings, page: "Settings" },
+  { label: "Profile", icon: User, page: "Profile" },
 ];
 
 const adminNav = [

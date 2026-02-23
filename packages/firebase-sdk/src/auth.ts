@@ -9,7 +9,7 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { getAuthInstance, getDb } from './config';
-import { collection, getDocs, query, limit as firestoreLimit } from 'firebase/firestore';
+import { collection, getDocs, query, limit as firestoreLimit, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { UserRole } from '@arkdata/shared-types';
 
 export interface ArkDataUser {
@@ -20,6 +20,8 @@ export interface ArkDataUser {
   tenant_id: string;
   role: UserRole;
   created_at?: string;
+  phone?: string;
+  bio?: string;
 }
 
 /** Wait for Firebase Auth to resolve its initial state (cached after first resolution) */
@@ -121,6 +123,18 @@ export const auth = {
       // Fire-and-forget: a tiny read opens the channel in the background
       const db = getDb();
       getDocs(query(collection(db, 'tenants', cachedTenantId, '_warmup'), firestoreLimit(1))).catch(() => {});
+
+      // Merge extended profile fields (phone, bio) from Firestore user doc
+      try {
+        const userDoc = await getDoc(doc(db, 'tenants', cachedTenantId, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data.phone) cachedUser.phone = data.phone;
+          if (data.bio) cachedUser.bio = data.bio;
+        }
+      } catch {
+        // Non-blocking — doc may not exist yet for new users
+      }
     }
     return cachedUser;
   },
@@ -176,7 +190,7 @@ export const auth = {
   },
 
   /** Update current user profile — equivalent to base44.auth.updateMe(data) */
-  async updateMe(data: { name?: string; avatar_url?: string }): Promise<void> {
+  async updateMe(data: { name?: string; avatar_url?: string; phone?: string; bio?: string }): Promise<void> {
     const firebaseAuth = getAuthInstance();
     const user = firebaseAuth.currentUser;
     if (!user) throw { status: 401, message: 'Not authenticated' };
@@ -185,6 +199,24 @@ export const auth = {
       displayName: data.name,
       photoURL: data.avatar_url,
     });
+
+    // Persist extended fields to Firestore user doc
+    if (cachedTenantId) {
+      const db = getDb();
+      const userRef = doc(db, 'tenants', cachedTenantId, 'users', user.uid);
+      const updates: Record<string, unknown> = { updated_at: serverTimestamp() };
+      if (data.name !== undefined) updates.display_name = data.name;
+      if (data.phone !== undefined) updates.phone = data.phone;
+      if (data.bio !== undefined) updates.bio = data.bio;
+      await updateDoc(userRef, updates);
+    }
+
+    // Update cached user
+    if (cachedUser) {
+      if (data.name !== undefined) cachedUser.name = data.name;
+      if (data.phone !== undefined) cachedUser.phone = data.phone;
+      if (data.bio !== undefined) cachedUser.bio = data.bio;
+    }
   },
 
   /** Subscribe to auth state changes */

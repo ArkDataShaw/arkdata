@@ -9,6 +9,7 @@ import ComingSoon from "@/components/guards/ComingSoon";
 import { useAuth } from "@/lib/AuthContext";
 
 const OnboardingSprite = lazy(() => import("@/components/onboarding/OnboardingSprite"));
+import CompanyNameModal from "@/components/onboarding/CompanyNameModal";
 
 const adminPages = [
   "AdminTenants", "AdminTenantDetail", "AdminUsers", "AdminUserDetail",
@@ -21,7 +22,7 @@ const adminPages = [
 
 // Pages available to all tenants (everything else gets "Coming Soon" for non-arkdata tenants)
 const livePages = [
-  "AppSettings", "TeamMembers", "Profile", "Billing",
+  "AppSettings", "TeamMembers", "Profile", "Settings", "Billing",
   // Admin pages are gated separately by RequireRole
   ...adminPages,
 ];
@@ -93,6 +94,7 @@ export default function Layout({ children, currentPageName }) {
           </main>
         </div>
         <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} />
+        <CompanyNameModal />
         <Suspense fallback={null}>
           <OnboardingSprite currentPageName={currentPageName} />
         </Suspense>

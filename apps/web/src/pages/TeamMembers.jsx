@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { listMyTeamUsers, inviteUserFn, deleteTenantUser, updateUserRoleFn } from "@arkdata/firebase-sdk";
-import { UserPlus, Trash2, MoreHorizontal } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { getTenantId, getDb } from "@arkdata/firebase-sdk";
+import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { PlusCircle, MoreHorizontal, Search } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,10 +31,22 @@ import moment from "moment";
 const roleLabels = {
   super_admin: "Super Admin",
   tenant_admin: "Owner",
-  analyst: "Member",
-  operator: "Member",
   read_only: "Member",
 };
+
+const roleBadgeColors = {
+  super_admin: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  tenant_admin: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
+  read_only: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400",
+};
+
+function RoleBadge({ role }) {
+  return (
+    <Badge className={`text-xs ${roleBadgeColors[role] || roleBadgeColors.read_only}`}>
+      {roleLabels[role] || role}
+    </Badge>
+  );
+}
 
 export default function TeamMembers() {
   const { toast } = useToast();
@@ -40,6 +54,8 @@ export default function TeamMembers() {
   const { user } = useAuth();
   const tenantId = user?.tenant_id;
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [inviteSearchQuery, setInviteSearchQuery] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: "", role: "read_only" });
   const [resetLink, setResetLink] = useState(null);
@@ -53,10 +69,41 @@ export default function TeamMembers() {
     enabled: !!tenantId,
   });
 
+  // Fetch pending invitations from tenants/{tid}/invitations subcollection
+  const { data: invitations = [] } = useQuery({
+    queryKey: ["my-team-invitations", tenantId],
+    queryFn: async () => {
+      const tid = await getTenantId();
+      const db = getDb();
+      const snap = await getDocs(
+        query(collection(db, "tenants", tid, "invitations"), where("status", "==", "pending"))
+      );
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    },
+    enabled: !!tenantId,
+  });
+
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim()) return users;
+    const q = searchQuery.toLowerCase();
+    return users.filter(
+      (u) =>
+        (u.display_name || "").toLowerCase().includes(q) ||
+        (u.email || "").toLowerCase().includes(q)
+    );
+  }, [users, searchQuery]);
+
+  const filteredInvitations = useMemo(() => {
+    if (!inviteSearchQuery.trim()) return invitations;
+    const q = inviteSearchQuery.toLowerCase();
+    return invitations.filter((inv) => (inv.email || "").toLowerCase().includes(q));
+  }, [invitations, inviteSearchQuery]);
+
   const inviteMutation = useMutation({
     mutationFn: () => inviteUserFn(inviteForm.email, tenantId, inviteForm.role),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["my-team-users"] });
+      queryClient.invalidateQueries({ queryKey: ["my-team-invitations"] });
       setInviteOpen(false);
       setInviteForm({ email: "", role: "read_only" });
       if (data.reset_link) {
@@ -95,109 +142,237 @@ export default function TeamMembers() {
     },
   });
 
+  const revokeInviteMutation = useMutation({
+    mutationFn: async (inviteId) => {
+      const tid = await getTenantId();
+      const db = getDb();
+      await deleteDoc(doc(db, "tenants", tid, "invitations", inviteId));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-team-invitations"] });
+      toast({ title: "Invitation revoked" });
+    },
+    onError: (err) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const isAdmin = user?.role === "tenant_admin" || user?.role === "super_admin";
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Team Members
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Manage who has access to your workspace
-          </p>
-        </div>
-        <Button size="sm" onClick={() => setInviteOpen(true)}>
-          <UserPlus className="w-4 h-4 mr-1.5" />
-          Invite Member
-        </Button>
-      </div>
-
+      {/* Team Members Card */}
       <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-slate-500">
-                <th className="px-4 py-3 font-medium">Name</th>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">Role</th>
-                <th className="px-4 py-3 font-medium">Joined</th>
-                <th className="px-4 py-3 font-medium w-12"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                    Loading...
-                  </td>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-bold">Team Members</CardTitle>
+              <CardDescription>Here you can manage the members of your team.</CardDescription>
+            </div>
+            {isAdmin && (
+              <Button
+                onClick={() => setInviteOpen(true)}
+                className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 rounded-full px-5"
+              >
+                <PlusCircle className="w-4 h-4 mr-1.5" />
+                Invite Members
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder="Search members"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Members Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-slate-500 dark:text-slate-400">
+                  <th className="px-4 py-3 font-medium">Name</th>
+                  <th className="px-4 py-3 font-medium">Email</th>
+                  <th className="px-4 py-3 font-medium">Role</th>
+                  <th className="px-4 py-3 font-medium">Joined at</th>
+                  <th className="px-4 py-3 font-medium w-12"></th>
                 </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                    No members yet. Invite someone to get started.
-                  </td>
-                </tr>
-              ) : (
-                users.map((u) => (
-                  <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-violet-100 dark:bg-violet-600/20 flex items-center justify-center">
-                          <span className="text-xs font-semibold text-violet-600 dark:text-violet-400">
-                            {(u.display_name || u.email)?.[0]?.toUpperCase() || "?"}
-                          </span>
-                        </div>
-                        <span className="font-medium text-slate-900 dark:text-slate-200">
-                          {u.display_name || "—"}
-                        </span>
-                        {u.id === user?.id && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">You</Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">{u.email}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant="outline" className="capitalize text-xs">
-                        {roleLabels[u.role] || u.role}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">
-                      {u.created_at
-                        ? moment(u.created_at.toDate ? u.created_at.toDate() : u.created_at).format("MMM D, YYYY")
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {u.id !== user?.id && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => { setRoleEditUser(u); setNewRole(u.role); }}
-                            >
-                              Change Role
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onClick={() => setDeleteUserId(u.id)}
-                            >
-                              <Trash2 className="w-4 h-4 mr-1.5" />
-                              Remove
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                      Loading...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                      {searchQuery ? "No members match your search." : "No members yet. Invite someone to get started."}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.map((u) => (
+                    <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-600/20 flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-semibold text-violet-600 dark:text-violet-400">
+                              {(u.display_name || u.email)?.[0]?.toUpperCase() || "?"}
+                            </span>
+                          </div>
+                          <span className="font-medium text-slate-900 dark:text-slate-200">
+                            {u.display_name || "—"}
+                          </span>
+                          {u.id === user?.id && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium">You</Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-slate-500 dark:text-slate-400">{u.email}</td>
+                      <td className="px-4 py-4">
+                        <RoleBadge role={u.role} />
+                      </td>
+                      <td className="px-4 py-4 text-slate-500 dark:text-slate-400">
+                        {u.created_at
+                          ? moment(u.created_at.toDate ? u.created_at.toDate() : u.created_at).format("M/D/YYYY")
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-4">
+                        {u.id !== user?.id && isAdmin && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => { setRoleEditUser(u); setNewRole(u.role); }}
+                              >
+                                Update Role
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => setDeleteUserId(u.id)}
+                              >
+                                Remove from Account
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
       </Card>
+
+      {/* Pending Invites Card */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-bold">Pending Invites</CardTitle>
+            <CardDescription>Here you can manage the pending invitations to your team.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Search Invitations"
+                value={inviteSearchQuery}
+                onChange={(e) => setInviteSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Invitations Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-slate-500 dark:text-slate-400">
+                    <th className="px-4 py-3 font-medium">Email</th>
+                    <th className="px-4 py-3 font-medium">Role</th>
+                    <th className="px-4 py-3 font-medium">Invited at</th>
+                    <th className="px-4 py-3 font-medium">Expires at</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium w-12"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredInvitations.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                        No data available
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredInvitations.map((inv) => (
+                      <tr key={inv.id} className="border-b last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0">
+                              <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                                {(inv.email)?.[0]?.toUpperCase() || "?"}
+                              </span>
+                            </div>
+                            <span className="text-slate-700 dark:text-slate-300">{inv.email}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <RoleBadge role={inv.role} />
+                        </td>
+                        <td className="px-4 py-4 text-slate-500 dark:text-slate-400">
+                          {inv.invited_at
+                            ? moment(inv.invited_at.toDate ? inv.invited_at.toDate() : inv.invited_at).format("M/D/YYYY")
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-4 text-slate-500 dark:text-slate-400">
+                          {inv.expires_at
+                            ? moment(inv.expires_at.toDate ? inv.expires_at.toDate() : inv.expires_at).format("M/D/YYYY")
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-green-600 dark:text-green-400">
+                            {inv.status === "pending" ? "Active" : inv.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => revokeInviteMutation.mutate(inv.id)}
+                              >
+                                Revoke Invitation
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Invite Dialog */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
@@ -250,7 +425,7 @@ export default function TeamMembers() {
       <Dialog open={!!roleEditUser} onOpenChange={(open) => !open && setRoleEditUser(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change Role</DialogTitle>
+            <DialogTitle>Update Role</DialogTitle>
             <DialogDescription>
               Update the role for {roleEditUser?.display_name || roleEditUser?.email}.
             </DialogDescription>
@@ -263,9 +438,7 @@ export default function TeamMembers() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="tenant_admin">Owner</SelectItem>
-                <SelectItem value="analyst">Analyst</SelectItem>
-                <SelectItem value="operator">Operator</SelectItem>
-                <SelectItem value="read_only">Viewer</SelectItem>
+                <SelectItem value="read_only">Member</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -285,7 +458,7 @@ export default function TeamMembers() {
       <AlertDialog open={!!deleteUserId} onOpenChange={(open) => !open && setDeleteUserId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Member</AlertDialogTitle>
+            <AlertDialogTitle>Remove from Account</AlertDialogTitle>
             <AlertDialogDescription>
               This will remove the user from your team and delete their account.
               This action cannot be undone.

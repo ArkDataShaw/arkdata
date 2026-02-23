@@ -86,6 +86,7 @@ import Profile from './pages/Profile';
 import Reports from './pages/Reports';
 import SegmentBuilder from './pages/SegmentBuilder';
 import Sessions from './pages/Sessions';
+import Settings from './pages/Settings';
 import TeamMembers from './pages/TeamMembers';
 import VisitorDetail from './pages/VisitorDetail';
 import Visitors from './pages/Visitors';
@@ -133,6 +134,7 @@ export const PAGES = {
     "Reports": Reports,
     "SegmentBuilder": SegmentBuilder,
     "Sessions": Sessions,
+    "Settings": Settings,
     "TeamMembers": TeamMembers,
     "VisitorDetail": VisitorDetail,
     "Visitors": Visitors,

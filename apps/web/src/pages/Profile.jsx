@@ -14,8 +14,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 const roleLabels = {
   super_admin: "Super Admin",
   tenant_admin: "Owner",
-  analyst: "Member",
-  operator: "Member",
   read_only: "Member",
 };
 
@@ -78,14 +76,19 @@ export default function Profile() {
     setSaving(true);
     setMessage(null);
     try {
-      // Update user profile
-      await base44.auth.updateMe({ name: formData.full_name });
+      // Update user profile (name + phone + bio persisted to Firestore)
+      await base44.auth.updateMe({
+        name: formData.full_name,
+        phone: formData.phone,
+        bio: formData.bio,
+      });
 
       // If owner and company name changed, update tenant doc
       if (isOwner && formData.company && formData.company !== tenantName && authUser?.tenant_id) {
         const db = getDb();
         await updateDoc(doc(db, "tenants", authUser.tenant_id), {
           name: formData.company,
+          name_confirmed: true,
         });
         setTenantName(formData.company);
       }

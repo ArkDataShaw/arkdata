@@ -36,8 +36,6 @@ import moment from "moment";
 const roleLabels = {
   super_admin: "Super Admin",
   tenant_admin: "Owner",
-  analyst: "Member",
-  operator: "Member",
   read_only: "Member",
 };
 
@@ -218,7 +216,7 @@ export default function AdminTenantDetail() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
-                                onClick={() => navigate(createPageUrl("AdminUserDetail") + `?id=${u.id}`)}
+                                onClick={() => navigate(createPageUrl("AdminUserDetail") + `?id=${u.id}&tenant=${tenantId}`)}
                               >
                                 View Details
                               </DropdownMenuItem>

@@ -4,7 +4,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import * as crypto from "crypto";
 import * as nodemailer from "nodemailer";
 
-const VALID_ROLES = ["super_admin", "tenant_admin", "analyst", "operator", "read_only"];
+const VALID_ROLES = ["super_admin", "tenant_admin", "read_only"];
 
 /** Check if caller can manage users for a given tenant */
 function assertCanManageUsers(

@@ -35,16 +35,12 @@ import moment from "moment";
 const roleLabels = {
   super_admin: "Super Admin",
   tenant_admin: "Owner",
-  analyst: "Analyst",
-  operator: "Operator",
-  read_only: "Viewer",
+  read_only: "Member",
 };
 
 const roleBadgeColors = {
   super_admin: "bg-red-100 text-red-700",
   tenant_admin: "bg-violet-100 text-violet-700",
-  analyst: "bg-blue-100 text-blue-700",
-  operator: "bg-amber-100 text-amber-700",
   read_only: "bg-slate-100 text-slate-700",
 };
 
@@ -282,9 +278,7 @@ export default function AdminUsers() {
               <SelectContent>
                 <SelectItem value="super_admin">Super Admin</SelectItem>
                 <SelectItem value="tenant_admin">Owner</SelectItem>
-                <SelectItem value="analyst">Analyst</SelectItem>
-                <SelectItem value="operator">Operator</SelectItem>
-                <SelectItem value="read_only">Viewer</SelectItem>
+                <SelectItem value="read_only">Member</SelectItem>
               </SelectContent>
             </Select>
           </div>

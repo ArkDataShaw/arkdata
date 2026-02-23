@@ -6,11 +6,15 @@ import {
   listTenantUsers, getTenant, updateUserRoleFn, deleteTenantUser,
 } from "@arkdata/firebase-sdk";
 import {
-  ArrowLeft, Mail, Shield, Calendar, Building2, UserCog, Trash2,
+  ArrowLeft, Mail, Shield, Calendar, Building2, UserCog, Trash2, Pencil,
 } from "lucide-react";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { getDb } from "@arkdata/firebase-sdk";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -30,16 +34,12 @@ import moment from "moment";
 const roleLabels = {
   super_admin: "Super Admin",
   tenant_admin: "Owner",
-  analyst: "Analyst",
-  operator: "Operator",
-  read_only: "Viewer",
+  read_only: "Member",
 };
 
 const roleBadgeColors = {
   super_admin: "bg-red-100 text-red-700",
   tenant_admin: "bg-violet-100 text-violet-700",
-  analyst: "bg-blue-100 text-blue-700",
-  operator: "bg-amber-100 text-amber-700",
   read_only: "bg-slate-100 text-slate-700",
 };
 
@@ -54,6 +54,12 @@ export default function AdminUserDetail() {
   const [roleOpen, setRoleOpen] = useState(false);
   const [newRole, setNewRole] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  // Edit profile state
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ display_name: "", phone: "", bio: "" });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
 
   const { data: tenant } = useQuery({
     queryKey: ["admin-tenant", tenantId],
@@ -86,6 +92,29 @@ export default function AdminUserDetail() {
     onSuccess: () => {
       toast({ title: "User deleted" });
       navigate(createPageUrl("AdminUsers"));
+    },
+    onError: (err) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const editProfileMutation = useMutation({
+    mutationFn: async () => {
+      const db = getDb();
+      const updates = {
+        display_name: editForm.display_name,
+        phone: editForm.phone,
+        bio: editForm.bio,
+        updated_at: serverTimestamp(),
+      };
+      await updateDoc(doc(db, "tenants", tenantId, "users", userId), updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-tenant-users", tenantId] });
+      setEditing(false);
+      setConfirmOpen(false);
+      setConfirmText("");
+      toast({ title: "Profile updated" });
     },
     onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -156,22 +185,81 @@ export default function AdminUserDetail() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <Mail className="w-4 h-4 text-slate-400" />
-              {user.email}
+          {editing ? (
+            <div className="space-y-4 pt-2">
+              <div>
+                <Label className="text-sm font-medium">Display Name</Label>
+                <Input
+                  value={editForm.display_name}
+                  onChange={(e) => setEditForm({ ...editForm, display_name: e.target.value })}
+                  placeholder="Display name"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Phone</Label>
+                <Input
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  placeholder="+1 (555) 000-0000"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Bio</Label>
+                <Textarea
+                  value={editForm.bio}
+                  onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                  placeholder="Short bio..."
+                  className="mt-1 min-h-20"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  Save Changes
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditing(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <Shield className="w-4 h-4 text-slate-400" />
-              {roleLabels[user.role] || user.role}
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <Mail className="w-4 h-4 text-slate-400" />
+                {user.email}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <Shield className="w-4 h-4 text-slate-400" />
+                {roleLabels[user.role] || user.role}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                Joined {user.created_at
+                  ? moment(user.created_at.toDate ? user.created_at.toDate() : user.created_at).format("MMM D, YYYY")
+                  : "—"}
+              </div>
+              {user.phone && (
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <Mail className="w-4 h-4 text-slate-400" />
+                  {user.phone}
+                </div>
+              )}
+              {user.bio && (
+                <div className="col-span-full text-sm text-slate-600">
+                  {user.bio}
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              Joined {user.created_at
-                ? moment(user.created_at.toDate ? user.created_at.toDate() : user.created_at).format("MMM D, YYYY")
-                : "—"}
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -198,6 +286,22 @@ export default function AdminUserDetail() {
 
       {/* Actions */}
       <div className="flex gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setEditForm({
+              display_name: user.display_name || "",
+              phone: user.phone || "",
+              bio: user.bio || "",
+            });
+            setEditing(true);
+          }}
+          disabled={editing}
+        >
+          <Pencil className="w-4 h-4 mr-1.5" />
+          Edit Profile
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -235,9 +339,7 @@ export default function AdminUserDetail() {
               <SelectContent>
                 <SelectItem value="super_admin">Super Admin</SelectItem>
                 <SelectItem value="tenant_admin">Owner</SelectItem>
-                <SelectItem value="analyst">Analyst</SelectItem>
-                <SelectItem value="operator">Operator</SelectItem>
-                <SelectItem value="read_only">Viewer</SelectItem>
+                <SelectItem value="read_only">Member</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -248,6 +350,39 @@ export default function AdminUserDetail() {
               disabled={roleChangeMutation.isPending || newRole === user.role}
             >
               {roleChangeMutation.isPending ? "Updating..." : "Update Role"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Profile CONFIRM Dialog */}
+      <Dialog open={confirmOpen} onOpenChange={(open) => {
+        if (!open) { setConfirmOpen(false); setConfirmText(""); }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Profile Edit</DialogTitle>
+            <DialogDescription>
+              You are editing <strong>{user.display_name || user.email}</strong>'s profile.
+              Type <strong>CONFIRM</strong> to proceed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              placeholder='Type "CONFIRM" to continue'
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setConfirmOpen(false); setConfirmText(""); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => editProfileMutation.mutate()}
+              disabled={confirmText !== "CONFIRM" || editProfileMutation.isPending}
+            >
+              {editProfileMutation.isPending ? "Saving..." : "Save Profile"}
             </Button>
           </DialogFooter>
         </DialogContent>

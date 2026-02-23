@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import {
   Home, Users, Building2, Activity, AlertTriangle, BarChart3,
-  Plug, GitBranch, FileText, Settings,
+  Plug, GitBranch, FileText, Settings, User,
   Shield, Layers, Target, CreditCard, CodeXml, Key,
   Moon, Sun, LogOut
 } from "lucide-react";
@@ -70,7 +70,7 @@ export default function Sidebar({ currentPage, collapsed, onToggleCollapse, dark
       { label: "Reports", icon: FileText, page: "Reports" },
       { label: "Billing", icon: CreditCard, page: "Billing" },
       ...(isTeamAdmin ? [{ label: "Team", icon: Users, page: "TeamMembers" }] : []),
-      { label: "Settings", icon: Settings, page: "Profile" },
+      { label: "Settings", icon: Settings, page: "Settings" },
     ],
   };
 
@@ -170,6 +170,13 @@ export default function Sidebar({ currentPage, collapsed, onToggleCollapse, dark
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-48">
+            <DropdownMenuItem asChild className="cursor-pointer">
+              <Link to={createPageUrl("Profile")}>
+                <User className="w-4 h-4 mr-2" />
+                Profile
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onToggleDarkMode} className="cursor-pointer">
               {darkMode ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
               {darkMode ? "Light Mode" : "Dark Mode"}
