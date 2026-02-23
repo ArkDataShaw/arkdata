@@ -110,7 +110,8 @@ export const auth = {
     const user = await waitForAuthReady();
     if (!user) throw { status: 401, message: 'Not authenticated' };
 
-    const tokenResult = await user.getIdTokenResult();
+    // Force refresh on first load to ensure custom claims are present
+    const tokenResult = await user.getIdTokenResult(true);
     cachedTokenClaims = tokenResult.claims as Record<string, unknown>;
     cachedUser = firebaseUserToArkData(user, cachedTokenClaims);
     // Also populate tenant cache while we have the claims
@@ -131,7 +132,9 @@ export const auth = {
     cachedTokenClaims = null;
     const firebaseAuth = getAuthInstance();
     const cred = await signInWithEmailAndPassword(firebaseAuth, email, password);
-    const tokenResult = await cred.user.getIdTokenResult();
+    // Force refresh to ensure custom claims (tenant_id, role) are present —
+    // especially important after password reset which revokes prior tokens
+    const tokenResult = await cred.user.getIdTokenResult(true);
     cachedTokenClaims = tokenResult.claims as Record<string, unknown>;
     cachedUser = firebaseUserToArkData(cred.user, cachedTokenClaims);
     if (cachedTokenClaims.tenant_id) cachedTenantId = cachedTokenClaims.tenant_id as string;
@@ -146,7 +149,7 @@ export const auth = {
     const firebaseAuth = getAuthInstance();
     const provider = new GoogleAuthProvider();
     const cred = await signInWithPopup(firebaseAuth, provider);
-    const tokenResult = await cred.user.getIdTokenResult();
+    const tokenResult = await cred.user.getIdTokenResult(true);
     cachedTokenClaims = tokenResult.claims as Record<string, unknown>;
     cachedUser = firebaseUserToArkData(cred.user, cachedTokenClaims);
     if (cachedTokenClaims.tenant_id) cachedTenantId = cachedTokenClaims.tenant_id as string;
