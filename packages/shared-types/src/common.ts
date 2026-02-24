@@ -23,7 +23,18 @@ export interface PaginatedResponse<T> {
 }
 
 /** RBAC roles */
-export type UserRole = 'super_admin' | 'tenant_admin' | 'read_only';
+export type UserRole = 'platform_admin' | 'super_admin' | 'tenant_admin' | 'read_only';
+
+/** Per-tenant branding overrides */
+export interface TenantBranding {
+  logo_url?: string;
+  app_name?: string;
+  primary_color?: string;
+  accent_color?: string;
+  favicon_url?: string;
+  email_logo_url?: string;
+  email_footer_text?: string;
+}
 
 /** Identity resolution confidence */
 export type MatchType = 'hem' | 'email' | 'phone' | 'name_company' | 'ip_ua';

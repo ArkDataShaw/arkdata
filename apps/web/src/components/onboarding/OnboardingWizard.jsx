@@ -7,8 +7,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ChevronRight, ChevronLeft, HelpCircle, CheckCircle2, Clock } from "lucide-react";
 import { createPageUrl } from "@/utils";
+import { useBranding } from "@/lib/BrandingContext";
 
 export default function OnboardingWizard({ open, onOpenChange, flowId, tenantId }) {
+  const branding = useBranding();
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [localTaskStatuses, setLocalTaskStatuses] = useState({});
   const [taskStartTimes, setTaskStartTimes] = useState({});
@@ -185,7 +187,7 @@ export default function OnboardingWizard({ open, onOpenChange, flowId, tenantId 
         <div className="flex items-center justify-between mb-4 pb-4 border-b">
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-              Welcome to Ark Data
+              Welcome to {branding.app_name || "Ark Data"}
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               Let's get you set up in {completedCount}/{allTasks.length} steps

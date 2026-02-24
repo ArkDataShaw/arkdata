@@ -14,20 +14,26 @@
  *   base44.auth.me()
  */
 
-export { initializeFirebase, getDb, getAuthInstance } from './config';
+export { initializeFirebase, getDb, getAuthInstance, getStorageInstance } from './config';
 export { auth, getTenantId, getUserRole, clearTenantIdCache, getImpersonationOrigin, clearImpersonationOrigin, type ArkDataUser, type ImpersonationOrigin } from './auth';
 export { createEntityProxy, type EntityProxy } from './entities';
-export { listAllTenants, getTenant, listTenantUsers, listMyTeamUsers } from './admin';
+export { listAllTenants, getTenant, listTenantUsers, listMyTeamUsers, getTenantBranding } from './admin';
 export {
   createTenantFn,
+  createPartnerTenantFn,
   inviteUserFn,
   updateUserRoleFn,
   deleteTenantUser,
   updateTenantLimitsFn,
+  updateTenantBrandingFn,
   impersonateUserFn,
   endImpersonationFn,
   requestPasswordResetFn,
+  addDomainFn,
+  removeDomainFn,
+  verifyDomainFn,
 } from './functions';
+export { uploadBrandingAsset, deleteBrandingAsset } from './storage';
 import { createEntityProxy } from './entities';
 import { auth } from './auth';
 

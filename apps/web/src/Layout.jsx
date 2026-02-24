@@ -12,14 +12,22 @@ const OnboardingSprite = lazy(() => import("@/components/onboarding/OnboardingSp
 import CompanyNameModal from "@/components/onboarding/CompanyNameModal";
 import ImpersonationBanner, { useImpersonation } from "@/components/layout/ImpersonationBanner";
 
-const adminPages = [
-  "AdminTenants", "AdminTenantDetail", "AdminUsers", "AdminUserDetail",
+// Pages accessible by platform_admin only
+const platformOnlyPages = [
   "AdminUIConfig", "AdminHelpCMS", "AdminIntegrations", "AdminPipeline",
   "AdminLogs", "AdminFeatureFlags", "AdminSecurity", "AdminBillingSettings",
   "AdminUIBuilder", "AdminJobs", "AdminWorkflows", "AdminFeedback",
   "AdminHealthDashboard", "AdminDataHygiene", "AdminOnboardingAnalytics",
-  "AdminOnboardingBuilder", "AdminOnboardingSupport",
+  "AdminOnboardingBuilder", "AdminOnboardingSupport", "AdminPartners",
 ];
+
+// Pages accessible by both platform_admin and super_admin (partner)
+const partnerAdminPages = [
+  "AdminTenants", "AdminTenantDetail", "AdminUsers", "AdminUserDetail",
+  "PartnerBranding", "PartnerCredits",
+];
+
+const adminPages = [...platformOnlyPages, ...partnerAdminPages];
 
 // Pages available to all tenants (everything else gets "Coming Soon" for non-arkdata tenants)
 const livePages = [
@@ -39,7 +47,8 @@ export default function Layout({ children, currentPageName }) {
   const { user } = useAuth();
   const isImpersonating = useImpersonation(user);
   const isAdminPage = adminPages.includes(currentPageName);
-  const isArkDataTenant = user?.tenant_id === "arkdata" || user?.role === "super_admin";
+  const isPlatformOnlyPage = platformOnlyPages.includes(currentPageName);
+  const isArkDataTenant = user?.tenant_id === "arkdata" || user?.role === "super_admin" || user?.role === "platform_admin";
   const isComingSoon = !isArkDataTenant && !livePages.includes(currentPageName);
 
   // Setup axios interceptors on mount
@@ -61,9 +70,15 @@ export default function Layout({ children, currentPageName }) {
 
   // Wrap admin pages in role guard; non-admin pages render directly
   let pageContent;
-  if (isAdminPage) {
+  if (isPlatformOnlyPage) {
     pageContent = (
-      <RequireRole roles={["super_admin"]}>
+      <RequireRole roles={["platform_admin"]}>
+        {children}
+      </RequireRole>
+    );
+  } else if (isAdminPage) {
+    pageContent = (
+      <RequireRole roles={["platform_admin", "super_admin"]}>
         {children}
       </RequireRole>
     );

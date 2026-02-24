@@ -22,7 +22,7 @@ export interface ArkDataUser {
   created_at?: string;
   phone?: string;
   bio?: string;
-  /** Set when a super_admin is impersonating this user */
+  /** Set when an admin is impersonating this user */
   impersonated_by?: string;
 }
 

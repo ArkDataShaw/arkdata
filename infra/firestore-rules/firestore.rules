@@ -34,8 +34,17 @@ service cloud.firestore {
     }
 
     // Role hierarchy checks
+    function isPlatformAdmin() {
+      return isAuthenticated() && userRole() == 'platform_admin';
+    }
+
     function isSuperAdmin() {
       return isAuthenticated() && userRole() == 'super_admin';
+    }
+
+    // Global admin: platform_admin or super_admin
+    function isGlobalAdmin() {
+      return isPlatformAdmin() || isSuperAdmin();
     }
 
     function isTenantAdmin(tenantId) {
@@ -56,7 +65,7 @@ service cloud.firestore {
 
     // Combined permission checks
     function canRead(tenantId) {
-      return isSuperAdmin()
+      return isGlobalAdmin()
         || isTenantAdmin(tenantId)
         || isAnalyst(tenantId)
         || isOperator(tenantId)
@@ -64,18 +73,18 @@ service cloud.firestore {
     }
 
     function canWrite(tenantId) {
-      return isSuperAdmin()
+      return isGlobalAdmin()
         || isTenantAdmin(tenantId);
     }
 
     function canManageSyncsAndPixels(tenantId) {
-      return isSuperAdmin()
+      return isGlobalAdmin()
         || isTenantAdmin(tenantId)
         || isOperator(tenantId);
     }
 
     function canCreateDashboards(tenantId) {
-      return isSuperAdmin()
+      return isGlobalAdmin()
         || isTenantAdmin(tenantId)
         || isAnalyst(tenantId);
     }
@@ -85,49 +94,51 @@ service cloud.firestore {
     // ========================================================================
 
     match /tenants/{tenantId} {
-      // super_admin can read/write ALL tenants (cross-tenant access for admin panel)
+      // Global admins can read/write ALL tenants (cross-tenant access for admin panel)
+      // super_admin can also read child tenants (where parent_tenant_id == their tenant)
       // tenant_admin can read own tenant, update settings
       // all tenant members can read their own tenant
-      allow read: if isSuperAdmin() || isTenantMember(tenantId);
-      allow create: if isSuperAdmin();
-      allow update: if isSuperAdmin() || isTenantAdmin(tenantId);
-      allow delete: if isSuperAdmin();
+      allow read: if isGlobalAdmin()
+        || isTenantMember(tenantId)
+        || (isSuperAdmin() && resource.data.parent_tenant_id == userTenantId());
+      allow create: if isGlobalAdmin();
+      allow update: if isGlobalAdmin() || isTenantAdmin(tenantId);
+      allow delete: if isPlatformAdmin();
 
       // ---- Users sub-collection ----
-      // super_admin can read/write users in ANY tenant (cross-tenant admin)
       match /users/{userId} {
-        allow read: if isSuperAdmin() || canRead(tenantId);
-        allow create, update: if isSuperAdmin() || canWrite(tenantId);
-        allow delete: if isSuperAdmin() || isTenantAdmin(tenantId);
+        allow read: if isGlobalAdmin() || canRead(tenantId);
+        allow create, update: if isGlobalAdmin() || canWrite(tenantId);
+        allow delete: if isGlobalAdmin() || isTenantAdmin(tenantId);
       }
 
       // ---- Domains (Pixels) sub-collection ----
       match /domains/{domainId} {
-        allow read: if isSuperAdmin() || canRead(tenantId);
-        allow create, update: if isSuperAdmin() || canManageSyncsAndPixels(tenantId);
-        allow delete: if isSuperAdmin() || isTenantAdmin(tenantId);
+        allow read: if isGlobalAdmin() || canRead(tenantId);
+        allow create, update: if isGlobalAdmin() || canManageSyncsAndPixels(tenantId);
+        allow delete: if isGlobalAdmin() || isTenantAdmin(tenantId);
       }
 
       // ---- Notifications sub-collection ----
       // Any authenticated user can create notifications for the arkdata tenant
       // (used for cross-tenant feedback notifications to admin)
       match /notifications/{notifId} {
-        allow read: if isSuperAdmin() || canRead(tenantId);
+        allow read: if isGlobalAdmin() || canRead(tenantId);
         allow create: if isAuthenticated() && tenantId == 'arkdata';
-        allow update, delete: if isSuperAdmin() || canWrite(tenantId);
+        allow update, delete: if isGlobalAdmin() || canWrite(tenantId);
       }
 
       // ---- Onboarding state sub-collection ----
       // Users can read/write their own onboarding state
       match /onboarding_state/{userId} {
         allow read, write: if isAuthenticated()
-          && (isSuperAdmin() || (isTenantMember(tenantId) && request.auth.uid == userId));
+          && (isGlobalAdmin() || (isTenantMember(tenantId) && request.auth.uid == userId));
       }
 
       // ---- All other tenant subcollections (catch-all for admin) ----
       match /{subcollection}/{docId} {
-        allow read: if isSuperAdmin() || canRead(tenantId);
-        allow write: if isSuperAdmin() || canWrite(tenantId);
+        allow read: if isGlobalAdmin() || canRead(tenantId);
+        allow write: if isGlobalAdmin() || canWrite(tenantId);
       }
     }
 
@@ -141,10 +152,10 @@ service cloud.firestore {
 
       // Only server (identity-resolution service) and admins can write
       allow create, update: if isServer()
-        || isSuperAdmin()
+        || isGlobalAdmin()
         || isTenantAdmin(resource.data.tenant_id);
 
-      allow delete: if isSuperAdmin()
+      allow delete: if isGlobalAdmin()
         || isTenantAdmin(resource.data.tenant_id);
     }
 
@@ -161,7 +172,7 @@ service cloud.firestore {
       // pipeline via Pub/Sub and are written by backend services.
       allow create: if isServer();
       allow update: if isServer();
-      allow delete: if isSuperAdmin();
+      allow delete: if isGlobalAdmin();
     }
 
     // ========================================================================
@@ -173,7 +184,7 @@ service cloud.firestore {
 
       // Sessions are created/updated by backend services only
       allow create, update: if isServer();
-      allow delete: if isSuperAdmin();
+      allow delete: if isGlobalAdmin();
     }
 
     // ========================================================================
@@ -185,7 +196,7 @@ service cloud.firestore {
 
       // Operators and admins can manage pixels
       allow create, update: if canManageSyncsAndPixels(resource.data.tenant_id);
-      allow delete: if isSuperAdmin()
+      allow delete: if isGlobalAdmin()
         || isTenantAdmin(resource.data.tenant_id);
     }
 
@@ -198,7 +209,7 @@ service cloud.firestore {
 
       // Analysts and admins can create and update dashboards
       allow create, update: if canCreateDashboards(resource.data.tenant_id);
-      allow delete: if isSuperAdmin()
+      allow delete: if isGlobalAdmin()
         || isTenantAdmin(resource.data.tenant_id);
     }
 
@@ -211,7 +222,7 @@ service cloud.firestore {
 
       // Operators and admins can manage syncs
       allow create, update: if canManageSyncsAndPixels(resource.data.tenant_id);
-      allow delete: if isSuperAdmin()
+      allow delete: if isGlobalAdmin()
         || isTenantAdmin(resource.data.tenant_id);
     }
 
@@ -222,7 +233,7 @@ service cloud.firestore {
     match /resolution_log/{logId} {
       allow read: if canRead(resource.data.tenant_id);
       allow create, update: if isServer();
-      allow delete: if isSuperAdmin();
+      allow delete: if isGlobalAdmin();
     }
 
     // ========================================================================

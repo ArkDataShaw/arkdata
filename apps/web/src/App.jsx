@@ -6,6 +6,7 @@ import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { BrandingProvider } from '@/lib/BrandingContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Login from '@/pages/Login';
 import ResetPassword from '@/pages/ResetPassword';
@@ -46,41 +47,43 @@ function App() {
 
   return (
     <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <NavigationTracker />
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/" element={
-              <RequireAuth>
-                <LayoutWrapper currentPageName={mainPageKey}>
-                  <MainPage />
-                </LayoutWrapper>
-              </RequireAuth>
-            } />
-            {Object.entries(Pages).map(([path, Page]) => (
-              <Route
-                key={path}
-                path={`/${path}`}
-                element={
-                  <RequireAuth>
-                    <LayoutWrapper currentPageName={path}>
-                      <Page />
-                    </LayoutWrapper>
-                  </RequireAuth>
-                }
-              />
-            ))}
-            <Route path="*" element={
-              <RequireAuth>
-                <PageNotFound />
-              </RequireAuth>
-            } />
-          </Routes>
-        </Router>
-        <Toaster />
-      </QueryClientProvider>
+      <BrandingProvider>
+        <QueryClientProvider client={queryClientInstance}>
+          <Router>
+            <NavigationTracker />
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/" element={
+                <RequireAuth>
+                  <LayoutWrapper currentPageName={mainPageKey}>
+                    <MainPage />
+                  </LayoutWrapper>
+                </RequireAuth>
+              } />
+              {Object.entries(Pages).map(([path, Page]) => (
+                <Route
+                  key={path}
+                  path={`/${path}`}
+                  element={
+                    <RequireAuth>
+                      <LayoutWrapper currentPageName={path}>
+                        <Page />
+                      </LayoutWrapper>
+                    </RequireAuth>
+                  }
+                />
+              ))}
+              <Route path="*" element={
+                <RequireAuth>
+                  <PageNotFound />
+                </RequireAuth>
+              } />
+            </Routes>
+          </Router>
+          <Toaster />
+        </QueryClientProvider>
+      </BrandingProvider>
     </AuthProvider>
   )
 }

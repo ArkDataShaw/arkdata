@@ -16,12 +16,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertCircle, TrendingDown } from "lucide-react";
+import { useBranding } from "@/lib/BrandingContext";
 
 export default function CancellationModal({
   open,
   onOpenChange,
   discountPercent = 30,
 }) {
+  const branding = useBranding();
   const [step, setStep] = useState("offer"); // offer or confirm
   const [reason, setReason] = useState("");
 
@@ -56,7 +58,7 @@ export default function CancellationModal({
                   <TrendingDown className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-1 flex-shrink-0" />
                   <div>
                     <p className="font-semibold text-emerald-900 dark:text-emerald-100">
-                      Keep Ark Data and save {discountPercent}%
+                      Keep {branding.app_name || "Ark Data"} and save {discountPercent}%
                     </p>
                     <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
                       We'll reduce your charges by{" "}

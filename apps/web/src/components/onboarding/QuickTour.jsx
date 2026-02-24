@@ -8,7 +8,7 @@ import { X, ChevronRight } from "lucide-react";
 const TOUR_STEPS = [
   {
     id: 1,
-    title: "Welcome to Ark Data",
+    title: "Welcome",
     body: "Track your website visitors and identify high-intent accounts.",
     selector: "[data-tour-id='home-hero']",
     placement: "center",

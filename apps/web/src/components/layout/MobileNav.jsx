@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/lib/AuthContext";
+import { useBranding } from "@/lib/BrandingContext";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
   Menu, Home, Users, Building2, Activity, AlertTriangle, BarChart3,
   Plug, GitBranch, FileText, Settings, Layers, Target, X, Shield, CodeXml,
-  CreditCard, Key, User
+  CreditCard, Key, Palette, User, Coins
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,16 +31,29 @@ const customerNav = [
   { label: "Profile", icon: User, page: "Profile" },
 ];
 
-const adminNav = [
+const platformAdminNav = [
+  { label: "Credits", icon: Coins, page: "PartnerCredits" },
   { label: "Teams", icon: Layers, page: "AdminTenants" },
   { label: "Users & Roles", icon: Shield, page: "AdminUsers" },
+  { label: "Branding", icon: Palette, page: "PartnerBranding" },
+  { label: "Partners", icon: Building2, page: "AdminPartners" },
   { label: "Security", icon: Key, page: "AdminSecurity" },
+];
+
+const partnerAdminNav = [
+  { label: "Credits", icon: Coins, page: "PartnerCredits" },
+  { label: "Teams", icon: Layers, page: "AdminTenants" },
+  { label: "Users & Roles", icon: Shield, page: "AdminUsers" },
+  { label: "Branding", icon: Palette, page: "PartnerBranding" },
 ];
 
 export default function MobileNav({ currentPage }) {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
-  const isSuperAdmin = user?.role === "super_admin";
+  const branding = useBranding();
+  const isPlatformAdmin = user?.role === "platform_admin";
+  const isSuperAdmin = isPlatformAdmin || user?.role === "super_admin";
+  const adminNav = isPlatformAdmin ? platformAdminNav : partnerAdminNav;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -54,11 +68,11 @@ export default function MobileNav({ currentPage }) {
           <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-2.5">
               <img
-                src="/logo.png"
-                alt="Ark Data"
+                src={branding.logo_url || "/logo.png"}
+                alt={branding.app_name || "Ark Data"}
                 className="w-8 h-8 object-contain"
               />
-              <span className="font-semibold text-slate-900 dark:text-white">Ark Data</span>
+              <span className="font-semibold text-slate-900 dark:text-white">{branding.app_name || "Ark Data"}</span>
             </div>
             <Button variant="ghost" size="icon" onClick={() => setOpen(false)}>
               <X className="w-5 h-5 text-slate-500 dark:text-slate-400" />

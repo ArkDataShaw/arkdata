@@ -529,7 +529,7 @@ function FlowEditor({ flow, onSave, onCancel }) {
           onChange={(e) =>
             setFormData({ ...formData, name: e.target.value })
           }
-          placeholder="e.g., Ark Data Setup (Default)"
+          placeholder="e.g., Platform Setup (Default)"
         />
       </div>
 

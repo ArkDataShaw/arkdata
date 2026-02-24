@@ -59,6 +59,7 @@ import AdminLogs from './pages/AdminLogs';
 import AdminOnboardingAnalytics from './pages/AdminOnboardingAnalytics';
 import AdminOnboardingBuilder from './pages/AdminOnboardingBuilder';
 import AdminOnboardingSupport from './pages/AdminOnboardingSupport';
+import AdminPartners from './pages/AdminPartners';
 import AdminPipeline from './pages/AdminPipeline';
 import AdminSecurity from './pages/AdminSecurity';
 import AdminTenantDetail from './pages/AdminTenantDetail';
@@ -91,6 +92,8 @@ import TeamMembers from './pages/TeamMembers';
 import VisitorDetail from './pages/VisitorDetail';
 import Visitors from './pages/Visitors';
 import Analytics from './pages/Analytics';
+import PartnerBranding from './pages/PartnerBranding';
+import PartnerCredits from './pages/PartnerCredits';
 import __Layout from './Layout.jsx';
 
 
@@ -107,6 +110,7 @@ export const PAGES = {
     "AdminOnboardingAnalytics": AdminOnboardingAnalytics,
     "AdminOnboardingBuilder": AdminOnboardingBuilder,
     "AdminOnboardingSupport": AdminOnboardingSupport,
+    "AdminPartners": AdminPartners,
     "AdminPipeline": AdminPipeline,
     "AdminSecurity": AdminSecurity,
     "AdminTenantDetail": AdminTenantDetail,
@@ -139,6 +143,8 @@ export const PAGES = {
     "VisitorDetail": VisitorDetail,
     "Visitors": Visitors,
     "Analytics": Analytics,
+    "PartnerBranding": PartnerBranding,
+    "PartnerCredits": PartnerCredits,
 }
 
 export const pagesConfig = {

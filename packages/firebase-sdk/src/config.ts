@@ -1,10 +1,12 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from 'firebase/firestore';
+import { getStorage as fbGetStorage, type FirebaseStorage } from 'firebase/storage';
 
 let app: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
 let dbInstance: Firestore | null = null;
+let storageInstance: FirebaseStorage | null = null;
 
 export function initializeFirebase(config?: Record<string, string>) {
   const firebaseConfig = config ?? {
@@ -40,6 +42,14 @@ export function getAuthInstance(): Auth {
 export function getDb(): Firestore {
   if (!dbInstance) throw new Error('Firebase not initialized. Call initializeFirebase() first.');
   return dbInstance;
+}
+
+export function getStorageInstance(): FirebaseStorage {
+  if (!app) throw new Error('Firebase not initialized. Call initializeFirebase() first.');
+  if (!storageInstance) {
+    storageInstance = fbGetStorage(app);
+  }
+  return storageInstance;
 }
 
 // Vite env type augmentation

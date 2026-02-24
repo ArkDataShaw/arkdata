@@ -29,12 +29,14 @@ import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 
 const roleLabels = {
+  platform_admin: "Platform Admin",
   super_admin: "Super Admin",
   tenant_admin: "Owner",
   read_only: "Member",
 };
 
 const roleBadgeColors = {
+  platform_admin: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   super_admin: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   tenant_admin: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
   read_only: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400",
@@ -157,7 +159,7 @@ export default function TeamMembers() {
     },
   });
 
-  const isAdmin = user?.role === "tenant_admin" || user?.role === "super_admin";
+  const isAdmin = user?.role === "tenant_admin" || user?.role === "super_admin" || user?.role === "platform_admin";
 
   return (
     <div className="p-6 space-y-6">

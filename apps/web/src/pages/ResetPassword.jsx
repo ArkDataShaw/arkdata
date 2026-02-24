@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, AlertCircle } from "lucide-react";
+import { useBranding } from "@/lib/BrandingContext";
 
 export default function ResetPassword() {
+  const branding = useBranding();
   const [searchParams] = useSearchParams();
   const oobCode = searchParams.get("oobCode");
 
@@ -83,10 +85,10 @@ export default function ResetPassword() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <img src="/logo.png" alt="Ark Data" className="w-12 h-12 mx-auto mb-2 object-contain" />
+          <img src={branding.logo_url || "/logo.png"} alt={branding.app_name || "Ark Data"} className="w-12 h-12 mx-auto mb-2 object-contain" />
           <CardTitle className="text-xl">Set Your Password</CardTitle>
           <p className="text-sm text-slate-500 mt-1">
-            Welcome to Ark Data. Create a password to access your account.
+            Welcome to {branding.app_name || "Ark Data"}. Create a password to access your account.
           </p>
         </CardHeader>
         <CardContent>

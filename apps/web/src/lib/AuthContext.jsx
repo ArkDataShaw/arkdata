@@ -1,5 +1,7 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import { getAuthInstance, clearTenantIdCache } from '@arkdata/firebase-sdk';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const AuthContext = createContext();
 
@@ -13,6 +15,35 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     checkAppState();
+  }, []);
+
+  // Listen for Firebase auth state changes (covers impersonation sign-in/sign-out)
+  useEffect(() => {
+    let mounted = true;
+    const firebaseAuth = getAuthInstance();
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (fbUser) => {
+      if (!mounted) return;
+      if (fbUser) {
+        // Auth user changed — clear caches and re-fetch the ArkData user
+        clearTenantIdCache();
+        try {
+          const currentUser = await base44.auth.me();
+          if (mounted) {
+            setUser(currentUser);
+            setIsAuthenticated(true);
+            setAuthError(null);
+          }
+        } catch {
+          // Will be handled by next checkAppState or page reload
+        }
+      } else {
+        if (mounted) {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      }
+    });
+    return () => { mounted = false; unsubscribe(); };
   }, []);
 
   const checkAppState = async () => {

@@ -6,25 +6,39 @@ import { Button } from "@/components/ui/button";
 
 /**
  * Checks if the current session is an active impersonation.
- * Returns the origin if impersonating, null otherwise.
+ * Returns true if impersonating, false otherwise.
  * Also cleans up stale localStorage if the origin matches the current user.
  */
 export function useImpersonation(user) {
-  const [isImpersonating, setIsImpersonating] = useState(false);
+  const [isImpersonating, setIsImpersonating] = useState(() => {
+    const origin = getImpersonationOrigin();
+    return !!origin && !!user && origin.admin_uid !== user?.id;
+  });
 
   useEffect(() => {
-    const origin = getImpersonationOrigin();
-    if (!origin || !user) {
-      setIsImpersonating(false);
-      return;
-    }
-    // Stale data — admin is viewing their own account normally
-    if (origin.admin_uid === user.id) {
-      clearImpersonationOrigin();
-      setIsImpersonating(false);
-      return;
-    }
-    setIsImpersonating(true);
+    const check = () => {
+      const origin = getImpersonationOrigin();
+      if (!origin || !user) {
+        setIsImpersonating(false);
+        return;
+      }
+      // Stale data — admin is viewing their own account normally
+      if (origin.admin_uid === user.id) {
+        clearImpersonationOrigin();
+        setIsImpersonating(false);
+        return;
+      }
+      setIsImpersonating(true);
+    };
+
+    check();
+
+    // Re-check when localStorage changes (e.g., from another tab or after impersonation switch)
+    const handleStorage = (e) => {
+      if (e.key === "arkdata_impersonation_origin") check();
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, [user?.id]);
 
   return isImpersonating;

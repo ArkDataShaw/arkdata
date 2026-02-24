@@ -2,8 +2,10 @@ import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Bell, BellOff } from "lucide-react";
+import { useBranding } from "@/lib/BrandingContext";
 
 export default function NotificationManager({ currentUser }) {
+  const branding = useBranding();
   const [enabled, setEnabled] = useState(false);
   const [permission, setPermission] = useState("default");
 
@@ -37,9 +39,9 @@ export default function NotificationManager({ currentUser }) {
         
         // Test notification
         new Notification("Notifications Enabled", {
-          body: "You'll now receive important updates from Ark Data",
-          icon: "/logo.png",
-          badge: "/logo.png"
+          body: `You'll now receive important updates from ${branding.app_name || "Ark Data"}`,
+          icon: branding.logo_url || "/logo.png",
+          badge: branding.logo_url || "/logo.png"
         });
       }
     }
@@ -59,8 +61,8 @@ export default function NotificationManager({ currentUser }) {
     if (permission === "granted" && enabled) {
       const notification = new Notification(data.title, {
         body: data.body,
-        icon: data.icon || "/logo.png",
-        badge: "/logo.png",
+        icon: data.icon || branding.logo_url || "/logo.png",
+        badge: branding.logo_url || "/logo.png",
         tag: data.type,
         requireInteraction: data.type === "visitor_identified" || data.type === "rule_triggered"
       });

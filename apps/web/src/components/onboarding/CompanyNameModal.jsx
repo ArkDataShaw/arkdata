@@ -8,15 +8,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Building2 } from "lucide-react";
+import { useBranding } from "@/lib/BrandingContext";
 
 export default function CompanyNameModal() {
   const { user } = useAuth();
+  const branding = useBranding();
   const [show, setShow] = useState(false);
   const [companyName, setCompanyName] = useState("");
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const isAdmin = user?.role === "tenant_admin" || user?.role === "super_admin";
+  const isAdmin = user?.role === "tenant_admin" || user?.role === "super_admin" || user?.role === "platform_admin";
 
   useEffect(() => {
     if (!user?.tenant_id || !isAdmin) return;
@@ -74,7 +76,7 @@ export default function CompanyNameModal() {
             <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center">
               <Building2 className="w-5 h-5 text-violet-600" />
             </div>
-            <DialogTitle className="text-xl">Welcome to Ark Data!</DialogTitle>
+            <DialogTitle className="text-xl">Welcome to {branding.app_name || "Ark Data"}!</DialogTitle>
           </div>
           <DialogDescription>
             Set your company name to get started. This will be visible to all team members.

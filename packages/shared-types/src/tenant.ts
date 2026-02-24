@@ -1,4 +1,4 @@
-import type { UserRole } from './common';
+import type { UserRole, TenantBranding } from './common';
 
 /** Tenant (organization) */
 export interface Tenant {
@@ -10,6 +10,9 @@ export interface Tenant {
   trial_expires_at?: string;
   settings: TenantSettings;
   limits: TenantLimits;
+  parent_tenant_id?: string | null;
+  branding?: TenantBranding;
+  custom_domain?: string;
   active_users?: number;
   domain_count?: number;
   last_event_at?: string;

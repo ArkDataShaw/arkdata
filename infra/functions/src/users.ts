@@ -4,20 +4,57 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import * as crypto from "crypto";
 import * as nodemailer from "nodemailer";
 
-const VALID_ROLES = ["super_admin", "tenant_admin", "read_only"];
+const VALID_ROLES = ["platform_admin", "super_admin", "tenant_admin", "read_only"];
+
+/** Check if a tenant is a child of the caller's tenant */
+async function isChildTenant(parentTenantId: string, targetTenantId: string): Promise<boolean> {
+  if (parentTenantId === targetTenantId) return true;
+  const db = getFirestore();
+  const targetSnap = await db.collection("tenants").doc(targetTenantId).get();
+  if (!targetSnap.exists) return false;
+  return targetSnap.data()?.parent_tenant_id === parentTenantId;
+}
 
 /** Check if caller can manage users for a given tenant */
-function assertCanManageUsers(
+async function assertCanManageUsers(
   auth: { uid: string; token: Record<string, unknown> },
   targetTenantId: string
-): void {
+): Promise<void> {
   const role = auth.token.role as string;
   const callerTenant = auth.token.tenant_id as string;
 
-  if (role === "super_admin") return;
+  if (role === "platform_admin") return;
+  if (role === "super_admin" && await isChildTenant(callerTenant, targetTenantId)) return;
   if (role === "tenant_admin" && callerTenant === targetTenantId) return;
 
   throw new functions.https.HttpsError("permission-denied", "Insufficient permissions to manage users");
+}
+
+/** Fetch tenant branding, falling back to defaults */
+async function getTenantBrandingForEmail(tenantId: string): Promise<{
+  app_name: string;
+  logo_url: string;
+  primary_color: string;
+  footer_text: string;
+}> {
+  const db = getFirestore();
+  const tenantSnap = await db.collection("tenants").doc(tenantId).get();
+  const branding = tenantSnap.data()?.branding || {};
+
+  // If child tenant has no branding, try parent
+  const parentId = tenantSnap.data()?.parent_tenant_id;
+  let parentBranding: Record<string, unknown> = {};
+  if (parentId) {
+    const parentSnap = await db.collection("tenants").doc(parentId).get();
+    parentBranding = parentSnap.data()?.branding || {};
+  }
+
+  return {
+    app_name: branding.app_name || parentBranding.app_name || "Ark Data",
+    logo_url: branding.email_logo_url || parentBranding.email_logo_url || "",
+    primary_color: branding.primary_color || parentBranding.primary_color || "#0f172a",
+    footer_text: branding.email_footer_text || parentBranding.email_footer_text || "",
+  };
 }
 
 /** Invite a user to a tenant — creates auth user, sets claims, sends reset email */
@@ -25,7 +62,7 @@ export const inviteUser = functions.https.onCall(async (data, context) => {
   const { email, tenant_id, role } = data;
 
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Must be logged in");
-  assertCanManageUsers(
+  await assertCanManageUsers(
     { uid: context.auth.uid, token: context.auth.token as Record<string, unknown> },
     tenant_id
   );
@@ -38,9 +75,14 @@ export const inviteUser = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", `Invalid role. Must be one of: ${VALID_ROLES.join(", ")}`);
   }
 
-  // Tenant admins cannot invite super_admins
-  if (context.auth.token.role !== "super_admin" && role === "super_admin") {
-    throw new functions.https.HttpsError("permission-denied", "Only super_admin can create other super_admins");
+  // platform_admin cannot be assigned via invite
+  if (role === "platform_admin") {
+    throw new functions.https.HttpsError("permission-denied", "platform_admin cannot be assigned via invite");
+  }
+
+  // Only platform_admin can assign super_admin
+  if (role === "super_admin" && context.auth.token.role !== "platform_admin") {
+    throw new functions.https.HttpsError("permission-denied", "Only platform_admin can assign super_admin role");
   }
 
   const db = getFirestore();
@@ -100,6 +142,9 @@ export const inviteUser = functions.https.onCall(async (data, context) => {
   const inviterName = callerRecord.displayName || callerRecord.email || "A team admin";
   const tenantName = tenantSnap.data()?.name || "your team";
 
+  // Fetch tenant branding for email
+  const emailBranding = await getTenantBrandingForEmail(tenant_id);
+
   // Send branded invite email via Gmail SMTP
   const smtpUser = functions.config().smtp?.user || "";
   const smtpPass = functions.config().smtp?.pass || "";
@@ -119,14 +164,20 @@ export const inviteUser = functions.https.onCall(async (data, context) => {
     },
   });
 
+  const logoHtml = emailBranding.logo_url
+    ? `<img src="${emailBranding.logo_url}" alt="${emailBranding.app_name}" style="max-height: 40px; margin-bottom: 8px;" />`
+    : "";
+  const footerText = emailBranding.footer_text || `${emailBranding.app_name} &middot; <a href="https://app.arkdata.io" style="color: #64748b;">app.arkdata.io</a>`;
+
   await transporter.sendMail({
-    from: '"Ark Data Support" <support@arkdata.io>',
+    from: `"${emailBranding.app_name} Support" <support@arkdata.io>`,
     to: email,
-    subject: `You've been invited to join ${tenantName} on Ark Data`,
+    subject: `You've been invited to join ${tenantName} on ${emailBranding.app_name}`,
     html: `
       <div style="max-width: 480px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b;">
         <div style="padding: 32px 24px; text-align: center;">
-          <h1 style="font-size: 24px; font-weight: 700; margin: 0 0 8px;">Ark Data</h1>
+          ${logoHtml}
+          <h1 style="font-size: 24px; font-weight: 700; margin: 0 0 8px;">${emailBranding.app_name}</h1>
           <p style="color: #64748b; font-size: 14px; margin: 0;">Team Invitation</p>
         </div>
         <div style="background: #f8fafc; border-radius: 12px; padding: 32px 24px; margin: 0 24px;">
@@ -134,12 +185,12 @@ export const inviteUser = functions.https.onCall(async (data, context) => {
             Hello ${email},
           </p>
           <p style="font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
-            ${inviterName} has invited you to the <strong>${tenantName}</strong> team on <strong>Ark Data</strong>.
+            ${inviterName} has invited you to the <strong>${tenantName}</strong> team on <strong>${emailBranding.app_name}</strong>.
             Click the button below to set your password and join the team.
           </p>
           <div style="text-align: center;">
             <a href="${resetLink}"
-               style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 15px; font-weight: 600;">
+               style="display: inline-block; background: ${emailBranding.primary_color}; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 15px; font-weight: 600;">
               Join ${tenantName}
             </a>
           </div>
@@ -153,7 +204,7 @@ export const inviteUser = functions.https.onCall(async (data, context) => {
             This invitation is intended for ${email}.
           </p>
           <p style="font-size: 12px; color: #94a3b8; margin: 0;">
-            Ark Data &middot; <a href="https://app.arkdata.io" style="color: #64748b;">app.arkdata.io</a>
+            ${footerText}
           </p>
         </div>
       </div>
@@ -183,14 +234,19 @@ export const updateUserRole = functions.https.onCall(async (data, context) => {
   const targetUser = await adminAuth.getUser(uid);
   const targetTenantId = (targetUser.customClaims?.tenant_id as string) || "";
 
-  assertCanManageUsers(
+  await assertCanManageUsers(
     { uid: context.auth.uid, token: context.auth.token as Record<string, unknown> },
     targetTenantId
   );
 
-  // Tenant admins cannot promote to super_admin
-  if (context.auth.token.role !== "super_admin" && role === "super_admin") {
-    throw new functions.https.HttpsError("permission-denied", "Only super_admin can assign super_admin role");
+  // platform_admin cannot be assigned via role update
+  if (role === "platform_admin") {
+    throw new functions.https.HttpsError("permission-denied", "platform_admin cannot be assigned via role update");
+  }
+
+  // Only platform_admin can assign super_admin
+  if (role === "super_admin" && context.auth.token.role !== "platform_admin") {
+    throw new functions.https.HttpsError("permission-denied", "Only platform_admin can assign super_admin role");
   }
 
   // Update custom claims (preserve tenant_id)
@@ -228,7 +284,7 @@ export const deleteUser = functions.https.onCall(async (data, context) => {
   const targetUser = await adminAuth.getUser(uid);
   const targetTenantId = (targetUser.customClaims?.tenant_id as string) || "";
 
-  assertCanManageUsers(
+  await assertCanManageUsers(
     { uid: context.auth.uid, token: context.auth.token as Record<string, unknown> },
     targetTenantId
   );
@@ -273,6 +329,18 @@ export const requestPasswordReset = functions.https.onCall(async (data) => {
   const oobCode = parsedUrl.searchParams.get("oobCode");
   const resetLink = `https://app.arkdata.io/reset-password?oobCode=${oobCode}`;
 
+  // Look up user's tenant for branding
+  let emailBranding = { app_name: "Ark Data", logo_url: "", primary_color: "#0f172a", footer_text: "" };
+  try {
+    const userRecord = await adminAuth.getUserByEmail(email);
+    const userTenantId = userRecord.customClaims?.tenant_id as string;
+    if (userTenantId) {
+      emailBranding = await getTenantBrandingForEmail(userTenantId);
+    }
+  } catch {
+    // Use defaults if lookup fails
+  }
+
   // Send branded email via Gmail SMTP
   const smtpUser = functions.config().smtp?.user || "";
   const smtpPass = functions.config().smtp?.pass || "";
@@ -292,14 +360,20 @@ export const requestPasswordReset = functions.https.onCall(async (data) => {
     },
   });
 
+  const resetLogoHtml = emailBranding.logo_url
+    ? `<img src="${emailBranding.logo_url}" alt="${emailBranding.app_name}" style="max-height: 40px; margin-bottom: 8px;" />`
+    : "";
+  const resetFooterText = emailBranding.footer_text || `${emailBranding.app_name} &middot; <a href="https://app.arkdata.io" style="color: #64748b;">app.arkdata.io</a>`;
+
   await transporter.sendMail({
-    from: '"Ark Data" <support@arkdata.io>',
+    from: `"${emailBranding.app_name}" <support@arkdata.io>`,
     to: email,
-    subject: "Reset your Ark Data password",
+    subject: `Reset your ${emailBranding.app_name} password`,
     html: `
       <div style="max-width: 480px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b;">
         <div style="padding: 32px 24px; text-align: center;">
-          <h1 style="font-size: 24px; font-weight: 700; margin: 0 0 8px;">Ark Data</h1>
+          ${resetLogoHtml}
+          <h1 style="font-size: 24px; font-weight: 700; margin: 0 0 8px;">${emailBranding.app_name}</h1>
           <p style="color: #64748b; font-size: 14px; margin: 0;">Password Reset</p>
         </div>
         <div style="background: #f8fafc; border-radius: 12px; padding: 32px 24px; margin: 0 24px;">
@@ -311,7 +385,7 @@ export const requestPasswordReset = functions.https.onCall(async (data) => {
           </p>
           <div style="text-align: center;">
             <a href="${resetLink}"
-               style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 15px; font-weight: 600;">
+               style="display: inline-block; background: ${emailBranding.primary_color}; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-size: 15px; font-weight: 600;">
               Reset Password
             </a>
           </div>
@@ -321,7 +395,7 @@ export const requestPasswordReset = functions.https.onCall(async (data) => {
         </div>
         <div style="padding: 24px; text-align: center;">
           <p style="font-size: 12px; color: #94a3b8; margin: 0;">
-            Ark Data &middot; <a href="https://app.arkdata.io" style="color: #64748b;">app.arkdata.io</a>
+            ${resetFooterText}
           </p>
         </div>
       </div>

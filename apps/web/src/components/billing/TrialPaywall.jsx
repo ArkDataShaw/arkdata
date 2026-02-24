@@ -2,8 +2,10 @@ import React from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
+import { useBranding } from "@/lib/BrandingContext";
 
 export default function TrialPaywall({ open, onClose }) {
+  const branding = useBranding();
   return (
     <Dialog open={open}>
       <DialogContent className="sm:max-w-md">
@@ -15,7 +17,7 @@ export default function TrialPaywall({ open, onClose }) {
             </h2>
             <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
               Your 30-day trial ended on January 15, 2025. Add a payment method
-              to continue using Ark Data.
+              to continue using {branding.app_name || "Ark Data"}.
             </p>
           </div>
 

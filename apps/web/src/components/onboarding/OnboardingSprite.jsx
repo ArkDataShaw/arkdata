@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 const ONBOARDING_STEPS = [
   {
     icon: Sparkles,
-    title: "Welcome to Ark Data!",
+    title: "Welcome!",
     body: "Let's get you set up. First, we'll create a tracking pixel for your website so you can start identifying visitors.",
     cta: "Go to Pixel Page",
   },

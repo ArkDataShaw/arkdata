@@ -2,11 +2,12 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/lib/AuthContext";
+import { useBranding } from "@/lib/BrandingContext";
 import { base44 } from "@/api/base44Client";
 import {
   Home, Users, Building2, Activity, AlertTriangle, BarChart3,
   Plug, GitBranch, FileText, Settings, User,
-  Shield, Layers, Target, CreditCard, CodeXml, Key,
+  Shield, Layers, Target, CreditCard, CodeXml, Key, Palette, Coins,
   Moon, Sun, LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -49,18 +50,35 @@ const mainNav = [
   },
 ];
 
-const adminSection = {
+// Platform admin sees partner admin tools + Partners
+const platformAdminSection = {
   section: "Admin",
   items: [
+    { label: "Credits", icon: Coins, page: "PartnerCredits" },
     { label: "Teams", icon: Layers, page: "AdminTenants" },
     { label: "Users & Roles", icon: Shield, page: "AdminUsers" },
+    { label: "Branding", icon: Palette, page: "PartnerBranding" },
+    { label: "Partners", icon: Building2, page: "AdminPartners" },
     { label: "Security", icon: Key, page: "AdminSecurity" },
+  ],
+};
+
+// Partner (super_admin) sees scoped admin tools
+const partnerAdminSection = {
+  section: "Admin",
+  items: [
+    { label: "Credits", icon: Coins, page: "PartnerCredits" },
+    { label: "Teams", icon: Layers, page: "AdminTenants" },
+    { label: "Users & Roles", icon: Shield, page: "AdminUsers" },
+    { label: "Branding", icon: Palette, page: "PartnerBranding" },
   ],
 };
 
 export default function Sidebar({ currentPage, collapsed, onToggleCollapse, darkMode, onToggleDarkMode }) {
   const { user } = useAuth();
-  const isSuperAdmin = user?.role === "super_admin";
+  const branding = useBranding();
+  const isPlatformAdmin = user?.role === "platform_admin";
+  const isSuperAdmin = isPlatformAdmin || user?.role === "super_admin";
   const isTeamAdmin = user?.role === "tenant_admin" || isSuperAdmin;
 
   // Build settings section dynamically — add Team Members for admins
@@ -75,6 +93,7 @@ export default function Sidebar({ currentPage, collapsed, onToggleCollapse, dark
   };
 
   const baseNav = [mainNav[0], mainNav[1], settingsSection];
+  const adminSection = isPlatformAdmin ? platformAdminSection : partnerAdminSection;
   const sections = isSuperAdmin ? [...baseNav, adminSection] : baseNav;
 
   return (
@@ -96,8 +115,8 @@ export default function Sidebar({ currentPage, collapsed, onToggleCollapse, dark
           collapsed ? "justify-center" : "gap-2.5"
         )}>
           <img
-            src="/logo.png"
-            alt="Ark Data"
+            src={branding.logo_url || "/logo.png"}
+            alt={branding.app_name || "Ark Data"}
             className={cn(
               "object-contain flex-shrink-0",
               collapsed ? "w-10 h-10" : "w-11 h-11 -m-1.5"
@@ -105,7 +124,7 @@ export default function Sidebar({ currentPage, collapsed, onToggleCollapse, dark
           />
           {!collapsed && (
             <span className="font-semibold text-base tracking-tight whitespace-nowrap">
-              Ark Data
+              {branding.app_name || "Ark Data"}
             </span>
           )}
         </div>

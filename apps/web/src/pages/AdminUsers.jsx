@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { useAuth } from "@/lib/AuthContext";
 import {
   listAllTenants, updateUserRoleFn, deleteTenantUser, impersonateUserFn,
 } from "@arkdata/firebase-sdk";
@@ -33,12 +34,14 @@ import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 
 const roleLabels = {
+  platform_admin: "Platform Admin",
   super_admin: "Super Admin",
   tenant_admin: "Owner",
   read_only: "Member",
 };
 
 const roleBadgeColors = {
+  platform_admin: "bg-amber-100 text-amber-700",
   super_admin: "bg-red-100 text-red-700",
   tenant_admin: "bg-violet-100 text-violet-700",
   read_only: "bg-slate-100 text-slate-700",
@@ -48,6 +51,8 @@ export default function AdminUsers() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
+  const isPlatformAdmin = currentUser?.role === "platform_admin";
   const [search, setSearch] = useState("");
 
   // Role change state
@@ -276,7 +281,7 @@ export default function AdminUsers() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="super_admin">Super Admin</SelectItem>
+                {isPlatformAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
                 <SelectItem value="tenant_admin">Owner</SelectItem>
                 <SelectItem value="read_only">Member</SelectItem>
               </SelectContent>

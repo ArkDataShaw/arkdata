@@ -14,8 +14,10 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { createPageUrl } from "@/utils";
+import { useBranding } from "@/lib/BrandingContext";
 
 export default function OnboardingPage() {
+  const branding = useBranding();
   const [showCompleted, setShowCompleted] = useState(false);
   const [tenantId, setTenantId] = useState(null);
 
@@ -99,7 +101,7 @@ export default function OnboardingPage() {
           Onboarding Checklist
         </h1>
         <p className="text-slate-600 dark:text-slate-400">
-          Complete these steps to unlock the full power of Ark Data
+          Complete these steps to unlock the full power of {branding.app_name || "Ark Data"}
         </p>
       </div>
 
