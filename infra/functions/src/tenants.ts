@@ -114,7 +114,29 @@ export const createPartnerTenant = functions.https.onCall(async (data, context) 
     updated_at: FieldValue.serverTimestamp(),
   });
 
-  // If admin_email provided, invite a super_admin to the new partner tenant
+  // Auto-create a default child team with the same name as the partner
+  const defaultTeamRef = db.collection("tenants").doc();
+  await defaultTeamRef.set({
+    name,
+    slug: slug + "-default",
+    plan: "active",
+    status: "active",
+    parent_tenant_id: tenantRef.id,
+    limits: { ...DEFAULT_LIMITS },
+    settings: {
+      event_retention_days: 90,
+      max_pixels: 10,
+      max_users: 10,
+      features: [],
+    },
+    active_users: 0,
+    domain_count: 0,
+    created_at: FieldValue.serverTimestamp(),
+    updated_at: FieldValue.serverTimestamp(),
+  });
+
+  // If admin_email provided, invite a super_admin to the partner tenant
+  // and also add them as tenant_admin to the default child team
   if (admin_email && typeof admin_email === "string") {
     const { getAuth } = await import("firebase-admin/auth");
     const auth = getAuth();
@@ -129,9 +151,17 @@ export const createPartnerTenant = functions.https.onCall(async (data, context) 
         role: "super_admin",
         tenant_id: tenantRef.id,
       });
+      // Add user to partner tenant
       await db.collection("tenants").doc(tenantRef.id).collection("users").doc(userRecord.uid).set({
         email: admin_email,
         role: "super_admin",
+        status: "active",
+        created_at: FieldValue.serverTimestamp(),
+      });
+      // Also add user to the default child team
+      await db.collection("tenants").doc(defaultTeamRef.id).collection("users").doc(userRecord.uid).set({
+        email: admin_email,
+        role: "tenant_admin",
         status: "active",
         created_at: FieldValue.serverTimestamp(),
       });
@@ -141,7 +171,7 @@ export const createPartnerTenant = functions.https.onCall(async (data, context) 
     }
   }
 
-  return { tenant_id: tenantRef.id };
+  return { tenant_id: tenantRef.id, default_team_id: defaultTeamRef.id };
 });
 
 /** Update tenant limits — platform_admin or super_admin (scoped to own/child tenants) */
